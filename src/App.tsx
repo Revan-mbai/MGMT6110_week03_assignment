@@ -161,7 +161,7 @@ export default function App() {
                       activeTab === 'live' ? 'text-emerald-600 animate-pulse' : 'text-slate-500'
                     }`}
                   />
-                  <span>Live API</span>
+                  <span>Live Arrivals</span>
                 </button>
               </nav>
             </div>

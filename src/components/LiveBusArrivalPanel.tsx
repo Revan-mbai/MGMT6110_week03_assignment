@@ -7,8 +7,73 @@ import {
   CheckCircle2, 
   Bus as BusIcon, 
   Info,
-  ShieldAlert
+  ShieldAlert,
+  MapPin
 } from 'lucide-react';
+import { BUS_STOPS_DATA } from '../data';
+
+// Known Singapore bus stop directory for names and addresses
+const KNOWN_BUS_STOPS: Record<string, { name: string; road: string; address: string }> = {
+  '04121': {
+    name: 'Opp City Hall Complex',
+    road: 'North Bridge Rd',
+    address: 'North Bridge Road, Singapore 179098',
+  },
+  '09048': {
+    name: 'Opp Orchard Boulevard Stn',
+    road: 'Orchard Blvd',
+    address: 'Orchard Boulevard, Singapore 248649',
+  },
+  '08057': {
+    name: 'Somerset Station Gate B',
+    road: 'Somerset Rd',
+    address: 'Somerset Road, Singapore 238162',
+  },
+  '08031': {
+    name: 'Dhoby Ghaut Station Plaza',
+    road: 'Orchard Rd',
+    address: 'Orchard Road, Singapore 238826',
+  },
+  '01012': {
+    name: 'Bugis Junction North',
+    road: 'Victoria St',
+    address: 'Victoria Street, Singapore 188067',
+  },
+  '03019': {
+    name: 'Raffles Place Promenade',
+    road: 'Collyer Quay',
+    address: 'Collyer Quay, Singapore 049318',
+  },
+  '02049': {
+    name: 'Suntec City / Promenade Stn',
+    road: 'Temasek Blvd',
+    address: 'Temasek Boulevard, Singapore 038983',
+  },
+  '10169': {
+    name: 'HarbourFront Stn / Vivocity',
+    road: 'Telok Blangah Rd',
+    address: 'Telok Blangah Road, Singapore 099419',
+  },
+};
+
+export function getBusStopInfo(code: string): { name: string; road: string; address: string } {
+  if (KNOWN_BUS_STOPS[code]) {
+    return KNOWN_BUS_STOPS[code];
+  }
+  const match = BUS_STOPS_DATA.find((s) => s.code === code);
+  if (match) {
+    return {
+      name: match.name,
+      road: match.road,
+      address: `${match.road}, Singapore`,
+    };
+  }
+  return {
+    name: `Bus Stop ${code}`,
+    road: 'Singapore Public Bus Network',
+    address: `Bus Stop Code ${code}, Singapore`,
+  };
+}
 
 interface LiveServiceArrival {
   ServiceNo: string;
@@ -44,6 +109,8 @@ export const LiveBusArrivalPanel: React.FC<LiveBusArrivalPanelProps> = ({
     ltaAnswered?: boolean;
     upstreamStatus?: number | null;
   }>({ checked: false });
+
+  const stopInfo = getBusStopInfo(activeStopCode);
 
   // Quick bus stop suggestions for Singapore commuters
   const quickStops = [
@@ -274,6 +341,35 @@ export const LiveBusArrivalPanel: React.FC<LiveBusArrivalPanelProps> = ({
         </div>
       </div>
 
+      {/* Bus Stop Name & Address Display */}
+      <div
+        id="active-bus-stop-info-banner"
+        className="px-4 py-3 bg-white border-b border-slate-200 flex items-start gap-3"
+      >
+        <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center shrink-0 text-emerald-700 mt-0.5">
+          <MapPin className="w-4 h-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-mono text-xs font-black bg-slate-900 text-white px-2 py-0.5 rounded">
+              {activeStopCode}
+            </span>
+            <h4
+              id="active-bus-stop-name"
+              className="text-sm sm:text-base font-bold text-slate-900 truncate"
+            >
+              {stopInfo.name}
+            </h4>
+          </div>
+          <p
+            id="active-bus-stop-address"
+            className="text-xs text-slate-600 font-medium mt-0.5"
+          >
+            {stopInfo.address}
+          </p>
+        </div>
+      </div>
+
       {/* Services List or Informational Notice */}
       <div className="p-4">
         {errorNotice ? (
@@ -306,13 +402,13 @@ export const LiveBusArrivalPanel: React.FC<LiveBusArrivalPanelProps> = ({
         ) : isLoading && services.length === 0 ? (
           <div className="py-8 text-center text-slate-500 space-y-2">
             <RefreshCw className="w-6 h-6 animate-spin mx-auto text-emerald-600" />
-            <p className="text-xs font-semibold">Fetching live bus arrivals for stop {activeStopCode}...</p>
+            <p className="text-xs font-semibold">Fetching live bus arrivals for {stopInfo.name} ({activeStopCode})...</p>
           </div>
         ) : services.length === 0 ? (
           /* Empty services array treated as "no buses running", showing a plain sentence */
           <div id="no-services-running-sentence" className="py-6 px-4 bg-slate-50 rounded-xl text-center border border-slate-200">
             <p className="text-sm font-semibold text-slate-700">
-              No buses currently running for bus stop {activeStopCode}.
+              No buses currently running for {stopInfo.name} ({activeStopCode}).
             </p>
             <p className="text-xs text-slate-400 mt-1">
               Bus services may not be in operation at this hour or currently scheduled.
