@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { BusStop } from '../types';
 import {
   Star,
@@ -47,31 +47,49 @@ export const FavouritesScreen: React.FC<FavouritesScreenProps> = ({
   const [expandedStopCode, setExpandedStopCode] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [selectedMapStopCode, setSelectedMapStopCode] = useState<string | null>(null);
-  const [selectedStopToAdd, setSelectedStopToAdd] = useState<string>('');
-  const [customStopCode, setCustomStopCode] = useState<string>('');
+  const [searchBusStopInput, setSearchBusStopInput] = useState<string>('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
 
   // Filter ONLY bus stops that have been added by the user
   const favouriteStops = busStops.filter((stop) =>
     favouriteStopCodes.includes(stop.code)
   );
 
-  // Available stops that haven't been added to favourites yet
-  const unaddedStops = allAvailableStops.filter(
-    (stop) => !favouriteStopCodes.includes(stop.code)
-  );
-
   const toggleStopDropdown = (code: string) => {
     setExpandedStopCode((prev) => (prev === code ? null : code));
   };
 
-  const handleAddSelectedStop = (e: React.FormEvent) => {
-    e.preventDefault();
-    const codeToAdd = selectedStopToAdd.trim() || customStopCode.trim();
-    if (codeToAdd) {
-      onAddFavouriteStop(codeToAdd);
-      setSelectedStopToAdd('');
-      setCustomStopCode('');
-    }
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleAddBusStop = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const query = searchBusStopInput.trim();
+    if (!query) return;
+
+    // Check if query exactly matches a stop code or name
+    const exactCode = allAvailableStops.find(
+      (s) => s.code.toLowerCase() === query.toLowerCase()
+    );
+    const partialMatch = allAvailableStops.find(
+      (s) =>
+        s.code.toLowerCase().includes(query.toLowerCase()) ||
+        s.name.toLowerCase().includes(query.toLowerCase())
+    );
+
+    const codeToAdd = exactCode ? exactCode.code : (partialMatch ? partialMatch.code : query);
+    onAddFavouriteStop(codeToAdd);
+    setSearchBusStopInput('');
+    setIsDropdownOpen(false);
   };
 
   // Search filter within favourites
@@ -119,7 +137,7 @@ export const FavouritesScreen: React.FC<FavouritesScreenProps> = ({
       >
         <div className="flex items-center justify-between">
           <label
-            htmlFor="select-bus-stop-to-add"
+            htmlFor="search-bus-stop-code-input"
             className="text-xs font-bold text-slate-800 flex items-center gap-1.5"
           >
             <Plus className="w-4 h-4 text-emerald-600" />
@@ -127,63 +145,185 @@ export const FavouritesScreen: React.FC<FavouritesScreenProps> = ({
           </label>
         </div>
 
-        {unaddedStops.length > 0 ? (
-          <form onSubmit={handleAddSelectedStop} className="flex gap-2">
+        {/* Searchable Bus Stop Code Dropdown Bar */}
+        <div ref={dropdownRef} className="relative">
+          <form onSubmit={handleAddBusStop} className="flex gap-2">
             <div className="relative flex-1">
-              <select
-                id="select-bus-stop-to-add"
-                value={selectedStopToAdd}
-                onChange={(e) => setSelectedStopToAdd(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs sm:text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                id="search-bus-stop-code-input"
+                value={searchBusStopInput}
+                onChange={(e) => {
+                  setSearchBusStopInput(e.target.value);
+                  setIsDropdownOpen(true);
+                }}
+                onFocus={() => setIsDropdownOpen(true)}
+                placeholder="Search bus stop code (e.g. 09048)..."
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-8 py-2.5 text-xs sm:text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                autoComplete="off"
+              />
+              <button
+                type="button"
+                id="toggle-bus-stop-dropdown-btn"
+                onClick={() => setIsDropdownOpen((prev) => !prev)}
+                aria-label="Toggle bus stops list"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 transition-colors"
               >
-                <option value="">-- Select a bus stop to add --</option>
-                {unaddedStops.map((stop) => (
-                  <option key={stop.code} value={stop.code}>
-                    {stop.name} ({stop.code}) • {stop.road}
-                  </option>
-                ))}
-              </select>
+                <ChevronDown
+                  className={`w-4 h-4 transition-transform duration-200 ${
+                    isDropdownOpen ? 'rotate-180 text-emerald-600' : ''
+                  }`}
+                />
+              </button>
             </div>
 
             <button
               type="submit"
               id="add-favourite-btn"
-              disabled={!selectedStopToAdd}
+              disabled={!searchBusStopInput.trim()}
               className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs sm:text-sm shadow-xs transition-colors shrink-0"
             >
               <Plus className="w-4 h-4" />
               <span>Add</span>
             </button>
           </form>
-        ) : (
-          <div className="bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl p-3 text-xs font-medium flex items-center gap-2">
-            <BookmarkCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>All nearby bus stops have been added to your favourites.</span>
-          </div>
-        )}
 
-        {/* Quick Suggestion Chips if some stops are not yet added */}
-        {unaddedStops.length > 0 && (
-          <div className="pt-1">
-            <span className="text-[11px] font-semibold text-slate-400 block mb-1.5">
-              Quick add popular stops:
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {unaddedStops.slice(0, 3).map((stop) => (
+          {/* Filtered Dropdown Results List */}
+          {isDropdownOpen && (
+            <div
+              id="bus-stops-search-dropdown-menu"
+              className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl shadow-lg border border-slate-200 z-40 max-h-60 overflow-y-auto divide-y divide-slate-100"
+            >
+              {(() => {
+                const q = searchBusStopInput.trim().toLowerCase();
+                const matching = allAvailableStops.filter((stop) => {
+                  if (!q) return true;
+                  return (
+                    stop.code.toLowerCase().includes(q) ||
+                    stop.name.toLowerCase().includes(q) ||
+                    stop.road.toLowerCase().includes(q)
+                  );
+                });
+
+                if (matching.length === 0) {
+                  return (
+                    <div className="p-3 text-center space-y-1.5">
+                      <p className="text-xs text-slate-500">
+                        No predefined stop matching &ldquo;{searchBusStopInput}&rdquo;
+                      </p>
+                      {searchBusStopInput.trim() && (
+                        <button
+                          type="button"
+                          id="add-custom-code-btn"
+                          onClick={() => {
+                            onAddFavouriteStop(searchBusStopInput.trim());
+                            setSearchBusStopInput('');
+                            setIsDropdownOpen(false);
+                          }}
+                          className="text-xs font-bold text-emerald-600 hover:underline inline-flex items-center gap-1"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add bus stop code &ldquo;{searchBusStopInput.trim()}&rdquo; to favourites</span>
+                        </button>
+                      )}
+                    </div>
+                  );
+                }
+
+                return matching.map((stop) => {
+                  const isAlreadyAdded = favouriteStopCodes.includes(stop.code);
+                  return (
+                    <div
+                      key={stop.code}
+                      id={`dropdown-stop-option-${stop.code}`}
+                      onClick={() => {
+                        if (!isAlreadyAdded) {
+                          onAddFavouriteStop(stop.code);
+                          setSearchBusStopInput('');
+                          setIsDropdownOpen(false);
+                        }
+                      }}
+                      className={`p-2.5 sm:p-3 flex items-center justify-between gap-2 transition-colors ${
+                        isAlreadyAdded
+                          ? 'bg-slate-50/60 cursor-default'
+                          : 'hover:bg-emerald-50/60 cursor-pointer active:bg-emerald-100/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="font-mono font-black text-xs px-2 py-0.5 rounded-md bg-slate-900 text-white shrink-0">
+                          {stop.code}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+                            {stop.name}
+                          </p>
+                          <p className="text-[11px] text-slate-500 truncate">
+                            {stop.road} • {stop.distanceMeters}m
+                          </p>
+                        </div>
+                      </div>
+
+                      {isAlreadyAdded ? (
+                        <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 shrink-0">
+                          ✓ Added
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded-lg border border-emerald-200 shrink-0">
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add</span>
+                        </span>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          )}
+        </div>
+
+        {/* Nearby bus stop chips */}
+        <div className="pt-1">
+          <span className="text-[11px] font-semibold text-slate-500 block mb-1.5">
+            Nearby bus stop:
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {allAvailableStops.map((stop) => {
+              const isAlreadyAdded = favouriteStopCodes.includes(stop.code);
+              return (
                 <button
                   key={stop.code}
                   type="button"
-                  id={`quick-add-chip-${stop.code}`}
-                  onClick={() => onAddFavouriteStop(stop.code)}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 text-slate-700 border border-slate-200 transition-all active:scale-95"
+                  id={`nearby-bus-stop-chip-${stop.code}`}
+                  onClick={() => {
+                    if (!isAlreadyAdded) {
+                      onAddFavouriteStop(stop.code);
+                    }
+                  }}
+                  disabled={isAlreadyAdded}
+                  title={
+                    isAlreadyAdded
+                      ? `${stop.name} is already in favourites`
+                      : `Add ${stop.name} (${stop.code}) to favourites`
+                  }
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                    isAlreadyAdded
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200/80 cursor-default opacity-90'
+                      : 'bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 text-slate-700 border border-slate-200 active:scale-95'
+                  }`}
                 >
-                  <Plus className="w-3 h-3 text-emerald-600" />
-                  <span>{stop.name} ({stop.code})</span>
+                  {isAlreadyAdded ? (
+                    <BookmarkCheck className="w-3 h-3 text-emerald-600" />
+                  ) : (
+                    <Plus className="w-3 h-3 text-emerald-600" />
+                  )}
+                  <span className="font-bold">{stop.code}</span>
+                  <span className="truncate max-w-[120px]">{stop.name}</span>
                 </button>
-              ))}
-            </div>
+              );
+            })}
           </div>
-        )}
+        </div>
       </section>
 
       {/* Filter search if multiple favourites exist */}
