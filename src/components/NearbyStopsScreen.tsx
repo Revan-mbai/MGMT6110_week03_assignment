@@ -7,12 +7,11 @@ import {
   ChevronDown, 
   AlertTriangle, 
   ArrowRight,
-  Map as MapIcon,
-  List as ListIcon,
   Crosshair,
   Layers,
   Star
 } from 'lucide-react';
+import { NearbyGoogleMap } from './NearbyGoogleMap';
 
 interface NearbyStopsScreenProps {
   busStops: BusStop[];
@@ -87,27 +86,19 @@ export const NearbyStopsScreen: React.FC<NearbyStopsScreenProps> = ({
           </div>
         </div>
 
-        {/* Quick search input */}
-        <div className="relative">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input
-            id="bus-stop-search-input"
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by bus no., stop name, or code (e.g. 14, Orchard, 09048)..."
-            className="w-full bg-white border border-slate-300 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 shadow-xs"
-          />
-          {searchQuery && (
-            <button
-              id="clear-search-btn"
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400 hover:text-slate-600 p-1"
-            >
-              Clear
-            </button>
-          )}
-        </div>
+        {/* Google Maps showing user and nearby bus stops */}
+        <NearbyGoogleMap
+          busStops={busStops}
+          selectedStopCode={expandedStopCode}
+          onSelectStop={onSelectStop}
+          onHighlightStop={(code) => {
+            setExpandedStopCode((prev) => (prev === code ? null : code));
+            const el = document.getElementById(`bus-stop-dropdown-${code}`);
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+          }}
+        />
       </div>
 
       {/* VIEW 1: List View */}
@@ -521,27 +512,6 @@ export const NearbyStopsScreen: React.FC<NearbyStopsScreenProps> = ({
           )}
         </div>
       )}
-
-      {/* Floating Action Button (FAB) to Toggle Between List and Visual Map View */}
-      <button
-        type="button"
-        id="toggle-view-fab"
-        onClick={() => setViewMode((prev) => (prev === 'list' ? 'map' : 'list'))}
-        aria-label={viewMode === 'list' ? 'Switch to map view' : 'Switch to list view'}
-        className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 bg-slate-900 hover:bg-slate-800 active:bg-emerald-700 text-white font-bold text-sm py-3.5 px-5 rounded-full shadow-xl hover:shadow-2xl active:scale-95 transition-all duration-200 border border-slate-700 focus:outline-none focus:ring-4 focus:ring-emerald-400/40"
-      >
-        {viewMode === 'list' ? (
-          <>
-            <MapIcon className="w-4 h-4 text-emerald-400" />
-            <span>Map View</span>
-          </>
-        ) : (
-          <>
-            <ListIcon className="w-4 h-4 text-emerald-400" />
-            <span>List View</span>
-          </>
-        )}
-      </button>
     </main>
   );
 };
