@@ -10,12 +10,15 @@ import {
   Map as MapIcon,
   List as ListIcon,
   Crosshair,
-  Layers
+  Layers,
+  Star
 } from 'lucide-react';
 
 interface NearbyStopsScreenProps {
   busStops: BusStop[];
   onSelectStop: (stop: BusStop) => void;
+  favouriteStopCodes?: string[];
+  onToggleFavourite?: (code: string) => void;
 }
 
 // Approximate relative positions for central Singapore bus stops
@@ -31,6 +34,8 @@ const STOP_COORDINATES: Record<string, { x: number; y: number; landmark: string 
 export const NearbyStopsScreen: React.FC<NearbyStopsScreenProps> = ({
   busStops,
   onSelectStop,
+  favouriteStopCodes = [],
+  onToggleFavourite,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedStopCode, setExpandedStopCode] = useState<string | null>(null);
@@ -169,15 +174,50 @@ export const NearbyStopsScreen: React.FC<NearbyStopsScreenProps> = ({
                       </div>
                     </div>
 
-                    {/* Distance badge & Dropdown toggle icon */}
+                    {/* Distance badge, Favourite toggle & Dropdown toggle icon */}
                     <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
-                      <div>
-                        <span className="text-xs font-black text-slate-800 bg-slate-100 px-2 py-1 rounded-md">
-                          {stop.distanceMeters}m
-                        </span>
-                        <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
-                          ~{stop.walkingTimeMins} min walk
-                        </p>
+                      <div className="flex items-center gap-1.5">
+                        {onToggleFavourite && (
+                          <button
+                            type="button"
+                            id={`fav-btn-${stop.code}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onToggleFavourite(stop.code);
+                            }}
+                            title={
+                              favouriteStopCodes.includes(stop.code)
+                                ? 'Remove from favourites'
+                                : 'Add to favourites'
+                            }
+                            aria-label={
+                              favouriteStopCodes.includes(stop.code)
+                                ? `Remove ${stop.name} from favourites`
+                                : `Add ${stop.name} to favourites`
+                            }
+                            className={`p-1.5 rounded-lg transition-all ${
+                              favouriteStopCodes.includes(stop.code)
+                                ? 'text-amber-500 bg-amber-50 hover:bg-amber-100 border border-amber-200'
+                                : 'text-slate-400 hover:text-amber-500 hover:bg-slate-100 border border-transparent'
+                            }`}
+                          >
+                            <Star
+                              className={`w-4 h-4 ${
+                                favouriteStopCodes.includes(stop.code)
+                                  ? 'fill-amber-400 text-amber-500'
+                                  : ''
+                              }`}
+                            />
+                          </button>
+                        )}
+                        <div>
+                          <span className="text-xs font-black text-slate-800 bg-slate-100 px-2 py-1 rounded-md">
+                            {stop.distanceMeters}m
+                          </span>
+                          <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
+                            ~{stop.walkingTimeMins} min walk
+                          </p>
+                        </div>
                       </div>
                       <div className="p-1 rounded-full bg-slate-100 text-slate-600 mt-0.5">
                         <ChevronDown
@@ -396,13 +436,45 @@ export const NearbyStopsScreen: React.FC<NearbyStopsScreenProps> = ({
                   </div>
                 </div>
 
-                <div className="text-right shrink-0">
-                  <span className="text-xs font-black text-slate-800 bg-slate-100 px-2 py-1 rounded-md">
-                    {selectedMapStop.distanceMeters}m
-                  </span>
-                  <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
-                    ~{selectedMapStop.walkingTimeMins} min walk
-                  </p>
+                <div className="text-right shrink-0 flex items-center gap-2">
+                  {onToggleFavourite && (
+                    <button
+                      type="button"
+                      id={`map-fav-btn-${selectedMapStop.code}`}
+                      onClick={() => onToggleFavourite(selectedMapStop.code)}
+                      title={
+                        favouriteStopCodes.includes(selectedMapStop.code)
+                          ? 'Remove from favourites'
+                          : 'Add to favourites'
+                      }
+                      aria-label={
+                        favouriteStopCodes.includes(selectedMapStop.code)
+                          ? `Remove ${selectedMapStop.name} from favourites`
+                          : `Add ${selectedMapStop.name} to favourites`
+                      }
+                      className={`p-2 rounded-xl border transition-colors ${
+                        favouriteStopCodes.includes(selectedMapStop.code)
+                          ? 'text-amber-500 bg-amber-50 border-amber-200'
+                          : 'text-slate-400 hover:text-amber-500 bg-slate-50 border-slate-200'
+                      }`}
+                    >
+                      <Star
+                        className={`w-4 h-4 ${
+                          favouriteStopCodes.includes(selectedMapStop.code)
+                            ? 'fill-amber-400 text-amber-500'
+                            : ''
+                        }`}
+                      />
+                    </button>
+                  )}
+                  <div>
+                    <span className="text-xs font-black text-slate-800 bg-slate-100 px-2 py-1 rounded-md">
+                      {selectedMapStop.distanceMeters}m
+                    </span>
+                    <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
+                      ~{selectedMapStop.walkingTimeMins} min walk
+                    </p>
+                  </div>
                 </div>
               </div>
 

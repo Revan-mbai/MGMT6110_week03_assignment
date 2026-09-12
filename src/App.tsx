@@ -2,17 +2,55 @@ import React, { useState } from 'react';
 import { Header } from './components/Header';
 import { IncidentCarousel } from './components/IncidentCarousel';
 import { NearbyStopsScreen } from './components/NearbyStopsScreen';
+import { FavouritesScreen } from './components/FavouritesScreen';
 import { BusStopDetailScreen } from './components/BusStopDetailScreen';
 import { LiveBusArrivalPanel } from './components/LiveBusArrivalPanel';
 import { BUS_STOPS_DATA, TRAFFIC_INCIDENTS_DATA } from './data';
 import { BusStop } from './types';
-import { MapPin, Radio } from 'lucide-react';
+import { MapPin, Radio, Star } from 'lucide-react';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<'stops' | 'arrivals'>('stops');
-  const [activeTab, setActiveTab] = useState<'nearby' | 'live'>('nearby');
+  const [activeTab, setActiveTab] = useState<'nearby' | 'favourites' | 'live'>('nearby');
   const [selectedStop, setSelectedStop] = useState<BusStop>(BUS_STOPS_DATA[0]);
   const [activeApiStopCode, setActiveApiStopCode] = useState<string>('04121');
+
+  // Persisted favourite bus stops state
+  const [favouriteStopCodes, setFavouriteStopCodes] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('sg_bus_favourite_stops');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const handleToggleFavourite = (code: string) => {
+    setFavouriteStopCodes((prev) => {
+      const next = prev.includes(code)
+        ? prev.filter((c) => c !== code)
+        : [...prev, code];
+      try {
+        localStorage.setItem('sg_bus_favourite_stops', JSON.stringify(next));
+      } catch {
+        // Local storage error handling
+      }
+      return next;
+    });
+  };
+
+  const handleAddFavourite = (code: string) => {
+    setFavouriteStopCodes((prev) => {
+      if (prev.includes(code)) return prev;
+      const next = [...prev, code];
+      try {
+        localStorage.setItem('sg_bus_favourite_stops', JSON.stringify(next));
+      } catch {
+        // Local storage error handling
+      }
+      return next;
+    });
+  };
 
   const handleSelectStop = (stop: BusStop) => {
     setSelectedStop(stop);
@@ -43,7 +81,7 @@ export default function App() {
           onBackToStops={handleBackToStops}
         />
 
-        {/* Screen 1: Tabs for Nearby Bus Stops & Live Arrivals */}
+        {/* Screen 1: Tabs for Nearby Bus Stops, Favourites & Live Arrivals */}
         {currentScreen === 'stops' && (
           <>
             {/* Below header carousel showing latest traffic incidents */}
@@ -55,8 +93,9 @@ export default function App() {
                 id="main-screen-tabs"
                 role="tablist"
                 aria-label="Main Navigation Tabs"
-                className="grid grid-cols-2 p-1.5 bg-slate-200/80 rounded-2xl border border-slate-300/80 shadow-2xs"
+                className="grid grid-cols-3 p-1.5 bg-slate-200/80 rounded-2xl border border-slate-300/80 shadow-2xs gap-1"
               >
+                {/* Tab 1: Nearby Bus Stops */}
                 <button
                   type="button"
                   role="tab"
@@ -64,16 +103,46 @@ export default function App() {
                   aria-selected={activeTab === 'nearby'}
                   aria-controls="tabpanel-nearby-stops"
                   onClick={() => setActiveTab('nearby')}
-                  className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold transition-all ${
+                  className={`flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
                     activeTab === 'nearby'
                       ? 'bg-white text-slate-900 shadow-xs scale-[1.01]'
                       : 'text-slate-600 hover:text-slate-900 active:bg-slate-300/60'
                   }`}
                 >
-                  <MapPin className={`w-4 h-4 ${activeTab === 'nearby' ? 'text-emerald-600' : 'text-slate-500'}`} />
-                  <span>Nearby Bus Stops</span>
+                  <MapPin className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${activeTab === 'nearby' ? 'text-emerald-600' : 'text-slate-500'}`} />
+                  <span>Nearby</span>
                 </button>
 
+                {/* Tab 2: Favourites */}
+                <button
+                  type="button"
+                  role="tab"
+                  id="tab-favourites"
+                  aria-selected={activeTab === 'favourites'}
+                  aria-controls="tabpanel-favourites"
+                  onClick={() => setActiveTab('favourites')}
+                  className={`flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                    activeTab === 'favourites'
+                      ? 'bg-white text-slate-900 shadow-xs scale-[1.01]'
+                      : 'text-slate-600 hover:text-slate-900 active:bg-slate-300/60'
+                  }`}
+                >
+                  <Star
+                    className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${
+                      activeTab === 'favourites'
+                        ? 'text-amber-500 fill-amber-400'
+                        : 'text-slate-500'
+                    }`}
+                  />
+                  <span>Favourites</span>
+                  {favouriteStopCodes.length > 0 && (
+                    <span className="text-[10px] font-black bg-amber-500 text-white rounded-full px-1.5 py-0.5 leading-none">
+                      {favouriteStopCodes.length}
+                    </span>
+                  )}
+                </button>
+
+                {/* Tab 3: Live Bus Arrivals */}
                 <button
                   type="button"
                   role="tab"
@@ -81,29 +150,50 @@ export default function App() {
                   aria-selected={activeTab === 'live'}
                   aria-controls="tabpanel-live-arrivals"
                   onClick={() => setActiveTab('live')}
-                  className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold transition-all ${
+                  className={`flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
                     activeTab === 'live'
                       ? 'bg-white text-slate-900 shadow-xs scale-[1.01]'
                       : 'text-slate-600 hover:text-slate-900 active:bg-slate-300/60'
                   }`}
                 >
-                  <Radio className={`w-4 h-4 ${activeTab === 'live' ? 'text-emerald-600 animate-pulse' : 'text-slate-500'}`} />
-                  <span>Live Bus Arrivals</span>
+                  <Radio
+                    className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${
+                      activeTab === 'live' ? 'text-emerald-600 animate-pulse' : 'text-slate-500'
+                    }`}
+                  />
+                  <span>Live API</span>
                 </button>
               </nav>
             </div>
 
-            {/* Tab 1: Nearby Bus Stops */}
+            {/* Tab 1 Panel: Nearby Bus Stops */}
             {activeTab === 'nearby' && (
               <div id="tabpanel-nearby-stops" role="tabpanel" aria-labelledby="tab-nearby-stops">
                 <NearbyStopsScreen
                   busStops={BUS_STOPS_DATA}
                   onSelectStop={handleSelectStop}
+                  favouriteStopCodes={favouriteStopCodes}
+                  onToggleFavourite={handleToggleFavourite}
                 />
               </div>
             )}
 
-            {/* Tab 2: Live Bus Arrival Panel */}
+            {/* Tab 2 Panel: Favourites */}
+            {activeTab === 'favourites' && (
+              <div id="tabpanel-favourites" role="tabpanel" aria-labelledby="tab-favourites">
+                <FavouritesScreen
+                  busStops={BUS_STOPS_DATA}
+                  allAvailableStops={BUS_STOPS_DATA}
+                  favouriteStopCodes={favouriteStopCodes}
+                  onToggleFavourite={handleToggleFavourite}
+                  onAddFavouriteStop={handleAddFavourite}
+                  onSelectStop={handleSelectStop}
+                  onBrowseNearby={() => setActiveTab('nearby')}
+                />
+              </div>
+            )}
+
+            {/* Tab 3 Panel: Live Bus Arrival Panel */}
             {activeTab === 'live' && (
               <div id="tabpanel-live-arrivals" role="tabpanel" aria-labelledby="tab-live-arrivals" className="max-w-xl mx-auto px-4 pt-4">
                 <LiveBusArrivalPanel
