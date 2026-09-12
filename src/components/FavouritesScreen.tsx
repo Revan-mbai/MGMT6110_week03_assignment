@@ -49,6 +49,7 @@ export const FavouritesScreen: React.FC<FavouritesScreenProps> = ({
   const [selectedMapStopCode, setSelectedMapStopCode] = useState<string | null>(null);
   const [searchBusStopInput, setSearchBusStopInput] = useState<string>('');
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
+  const [searchErrorMessage, setSearchErrorMessage] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
 
   // Filter ONLY bus stops that have been added by the user
@@ -86,7 +87,13 @@ export const FavouritesScreen: React.FC<FavouritesScreenProps> = ({
         s.name.toLowerCase().includes(query.toLowerCase())
     );
 
-    const codeToAdd = exactCode ? exactCode.code : (partialMatch ? partialMatch.code : query);
+    if (!exactCode && !partialMatch) {
+      setSearchErrorMessage('bus stop code does not exist, try another code');
+      return;
+    }
+
+    const codeToAdd = exactCode ? exactCode.code : partialMatch.code;
+    setSearchErrorMessage(null);
     onAddFavouriteStop(codeToAdd);
     setSearchBusStopInput('');
     setIsDropdownOpen(false);
@@ -156,6 +163,7 @@ export const FavouritesScreen: React.FC<FavouritesScreenProps> = ({
                 value={searchBusStopInput}
                 onChange={(e) => {
                   setSearchBusStopInput(e.target.value);
+                  setSearchErrorMessage(null);
                   setIsDropdownOpen(true);
                 }}
                 onFocus={() => setIsDropdownOpen(true)}
@@ -189,6 +197,12 @@ export const FavouritesScreen: React.FC<FavouritesScreenProps> = ({
             </button>
           </form>
 
+          {searchErrorMessage && (
+            <p id="search-bus-stop-error-msg" className="text-xs font-semibold text-rose-600 mt-1.5">
+              {searchErrorMessage}
+            </p>
+          )}
+
           {/* Filtered Dropdown Results List */}
           {isDropdownOpen && (
             <div
@@ -208,25 +222,10 @@ export const FavouritesScreen: React.FC<FavouritesScreenProps> = ({
 
                 if (matching.length === 0) {
                   return (
-                    <div className="p-3 text-center space-y-1.5">
-                      <p className="text-xs text-slate-500">
-                        No predefined stop matching &ldquo;{searchBusStopInput}&rdquo;
+                    <div className="p-3 text-center space-y-1">
+                      <p id="search-bus-stop-dropdown-empty" className="text-xs text-rose-600 font-semibold">
+                        bus stop code does not exist, try another code
                       </p>
-                      {searchBusStopInput.trim() && (
-                        <button
-                          type="button"
-                          id="add-custom-code-btn"
-                          onClick={() => {
-                            onAddFavouriteStop(searchBusStopInput.trim());
-                            setSearchBusStopInput('');
-                            setIsDropdownOpen(false);
-                          }}
-                          className="text-xs font-bold text-emerald-600 hover:underline inline-flex items-center gap-1"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>Add bus stop code &ldquo;{searchBusStopInput.trim()}&rdquo; to favourites</span>
-                        </button>
-                      )}
                     </div>
                   );
                 }

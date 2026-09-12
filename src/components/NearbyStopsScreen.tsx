@@ -98,10 +98,10 @@ export const NearbyStopsScreen: React.FC<NearbyStopsScreenProps> = ({
               className="bg-white rounded-2xl p-8 text-center border border-slate-200 space-y-2"
             >
               <p className="text-slate-600 font-bold text-base">
-                No matching bus stops found
+                bus stop code does not exist, try another code
               </p>
               <p className="text-slate-400 text-xs">
-                Try searching for a different bus number or clear the search query.
+                Try searching for a different code or clear the search query.
               </p>
               <button
                 onClick={() => setSearchQuery('')}

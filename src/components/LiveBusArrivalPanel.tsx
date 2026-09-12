@@ -98,6 +98,7 @@ export const LiveBusArrivalPanel: React.FC<LiveBusArrivalPanelProps> = ({
 }) => {
   const [stopCodeInput, setStopCodeInput] = useState<string>(currentStopCode);
   const [activeStopCode, setActiveStopCode] = useState<string>(currentStopCode);
+  const [inputError, setInputError] = useState<string | null>(null);
   const [services, setServices] = useState<LiveServiceArrival[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorNotice, setErrorNotice] = useState<string | null>(null);
@@ -203,10 +204,22 @@ export const LiveBusArrivalPanel: React.FC<LiveBusArrivalPanelProps> = ({
     return () => clearInterval(intervalTimer);
   }, [activeStopCode]);
 
+  const isKnownStop = Boolean(
+    KNOWN_BUS_STOPS[activeStopCode] || BUS_STOPS_DATA.some((s) => s.code === activeStopCode)
+  );
+
   const handleApplyStopCode = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const clean = stopCodeInput.trim();
     if (clean) {
+      const exists = Boolean(
+        KNOWN_BUS_STOPS[clean] || BUS_STOPS_DATA.some((s) => s.code === clean)
+      );
+      if (!exists) {
+        setInputError('bus stop code does not exist, try another code');
+      } else {
+        setInputError(null);
+      }
       setActiveStopCode(clean);
       if (onSelectStopCode) onSelectStopCode(clean);
     }
@@ -301,7 +314,10 @@ export const LiveBusArrivalPanel: React.FC<LiveBusArrivalPanelProps> = ({
             id="bus-stop-code-input"
             type="text"
             value={stopCodeInput}
-            onChange={(e) => setStopCodeInput(e.target.value)}
+            onChange={(e) => {
+              setStopCodeInput(e.target.value);
+              setInputError(null);
+            }}
             placeholder="e.g. 04121"
             className="w-32 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
           />
@@ -316,6 +332,12 @@ export const LiveBusArrivalPanel: React.FC<LiveBusArrivalPanelProps> = ({
             Active: <strong className="font-mono text-slate-800">{activeStopCode}</strong>
           </span>
         </form>
+
+        {inputError && (
+          <p id="live-panel-input-error" className="text-xs text-rose-600 font-semibold mb-2">
+            {inputError}
+          </p>
+        )}
 
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-[11px] font-semibold text-slate-500">Quick stops:</span>
@@ -408,11 +430,15 @@ export const LiveBusArrivalPanel: React.FC<LiveBusArrivalPanelProps> = ({
           /* Empty services array treated as "no buses running", showing a plain sentence */
           <div id="no-services-running-sentence" className="py-6 px-4 bg-slate-50 rounded-xl text-center border border-slate-200">
             <p className="text-sm font-semibold text-slate-700">
-              No buses currently running for {stopInfo.name} ({activeStopCode}).
+              {!isKnownStop
+                ? 'bus stop code does not exist, try another code'
+                : `No buses currently running for ${stopInfo.name} (${activeStopCode}).`}
             </p>
-            <p className="text-xs text-slate-400 mt-1">
-              Bus services may not be in operation at this hour or currently scheduled.
-            </p>
+            {isKnownStop && (
+              <p className="text-xs text-slate-400 mt-1">
+                Bus services may not be in operation at this hour or currently scheduled.
+              </p>
+            )}
           </div>
         ) : (
           <div id="live-services-grid" className="space-y-2.5">
