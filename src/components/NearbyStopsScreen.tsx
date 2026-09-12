@@ -141,15 +141,15 @@ export const NearbyStopsScreen: React.FC<NearbyStopsScreenProps> = ({
                   id={`bus-stop-dropdown-${stop.code}`}
                   className="bg-white rounded-2xl shadow-sm border border-slate-200/90 overflow-hidden transition-all"
                 >
-                  {/* Clickable bus stop header to toggle dropdown */}
-                  <button
-                    type="button"
-                    id={`bus-stop-card-${stop.code}`}
-                    onClick={() => toggleStopDropdown(stop.code)}
-                    aria-expanded={isExpanded}
-                    className="w-full text-left p-4 hover:bg-slate-50/80 active:bg-slate-100 transition-colors flex items-start justify-between gap-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-inset"
-                  >
-                    <div className="flex items-start gap-2.5 min-w-0">
+                  {/* Bus stop header with separate clickable toggle and favourite button */}
+                  <div className="w-full text-left p-4 hover:bg-slate-50/80 transition-colors flex items-start justify-between gap-3">
+                    <button
+                      type="button"
+                      id={`bus-stop-card-${stop.code}`}
+                      onClick={() => toggleStopDropdown(stop.code)}
+                      aria-expanded={isExpanded}
+                      className="flex-1 text-left flex items-start gap-2.5 min-w-0 focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded-lg group"
+                    >
                       <div className="mt-0.5 w-7 h-7 rounded-lg bg-slate-900 flex items-center justify-center shrink-0">
                         <MapPin className="w-4 h-4 text-emerald-400" />
                       </div>
@@ -165,14 +165,14 @@ export const NearbyStopsScreen: React.FC<NearbyStopsScreenProps> = ({
                             {stop.road}
                           </span>
                         </div>
-                        <h3 className="text-base font-bold text-slate-900 mt-0.5 leading-snug">
+                        <h3 className="text-base font-bold text-slate-900 mt-0.5 leading-snug group-hover:text-emerald-700 transition-colors">
                           {stop.name}
                         </h3>
                         <p className="text-xs text-emerald-600 font-semibold mt-1">
                           {isExpanded ? 'Hide available buses' : 'Click to show available buses'}
                         </p>
                       </div>
-                    </div>
+                    </button>
 
                     {/* Distance badge, Favourite toggle & Dropdown toggle icon */}
                     <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
@@ -181,10 +181,7 @@ export const NearbyStopsScreen: React.FC<NearbyStopsScreenProps> = ({
                           <button
                             type="button"
                             id={`fav-btn-${stop.code}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onToggleFavourite(stop.code);
-                            }}
+                            onClick={() => onToggleFavourite(stop.code)}
                             title={
                               favouriteStopCodes.includes(stop.code)
                                 ? 'Remove from favourites'
@@ -210,24 +207,36 @@ export const NearbyStopsScreen: React.FC<NearbyStopsScreenProps> = ({
                             />
                           </button>
                         )}
-                        <div>
+                        <button
+                          type="button"
+                          onClick={() => toggleStopDropdown(stop.code)}
+                          aria-label={`Toggle buses for ${stop.name}`}
+                          className="text-right focus:outline-none"
+                        >
                           <span className="text-xs font-black text-slate-800 bg-slate-100 px-2 py-1 rounded-md">
                             {stop.distanceMeters}m
                           </span>
                           <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
                             ~{stop.walkingTimeMins} min walk
                           </p>
-                        </div>
+                        </button>
                       </div>
-                      <div className="p-1 rounded-full bg-slate-100 text-slate-600 mt-0.5">
+                      <button
+                        type="button"
+                        id={`toggle-dropdown-btn-${stop.code}`}
+                        onClick={() => toggleStopDropdown(stop.code)}
+                        aria-expanded={isExpanded}
+                        aria-label={isExpanded ? `Hide buses for ${stop.name}` : `Show buses for ${stop.name}`}
+                        className="p-1 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors mt-0.5 focus:outline-none"
+                      >
                         <ChevronDown
                           className={`w-4 h-4 transition-transform duration-200 ${
                             isExpanded ? 'rotate-180 text-emerald-600' : 'text-slate-500'
                           }`}
                         />
-                      </div>
+                      </button>
                     </div>
-                  </button>
+                  </div>
 
                   {/* Dropdown content: Only visible after user clicks on the bus stop */}
                   {isExpanded && (
