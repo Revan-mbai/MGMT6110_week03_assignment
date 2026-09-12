@@ -8,6 +8,10 @@ export interface TrafficIncident {
   affectedBuses: string[];
   delayMinutes: number;
   reportedTimeAgo: string;
+  advice?: string;
+  lanesAffected?: string;
+  estimatedClearance?: string;
+  source?: string;
 }
 
 export interface BusArrivalInfo {

@@ -15,6 +15,10 @@ export const TRAFFIC_INCIDENTS_DATA: TrafficIncident[] = [
     affectedBuses: ['65', '147', '857'],
     delayMinutes: 14,
     reportedTimeAgo: '4 mins ago',
+    advice: 'Commuters traveling towards Dhoby Ghaut / CBD are advised to take the North-East Line (NE8 Farrer Park) or North-South Line (NS20 Novena) to avoid CTE congestion.',
+    lanesAffected: 'All city-bound lanes moving at ~15 km/h',
+    estimatedClearance: '~25 mins (peak easing)',
+    source: 'LTA EMAS / Expressway Monitoring & Advisory System',
   },
   {
     id: 'inc-002',
@@ -24,6 +28,10 @@ export const TRAFFIC_INCIDENTS_DATA: TrafficIncident[] = [
     affectedBuses: ['14', '106', '111'],
     delayMinutes: 20,
     reportedTimeAgo: '8 mins ago',
+    advice: 'Traffic police and EMAS recovery tow trucks on site. Motorists and bus commuters should expect slow progress between Grange Road and Paterson Hill.',
+    lanesAffected: 'Lanes 1 & 2 (Leftmost)',
+    estimatedClearance: '~35 mins (towing in progress)',
+    source: 'Traffic Police & LTA EMAS',
   },
   {
     id: 'inc-003',
@@ -33,6 +41,10 @@ export const TRAFFIC_INCIDENTS_DATA: TrafficIncident[] = [
     affectedBuses: ['2', '12', '33', '133'],
     delayMinutes: 8,
     reportedTimeAgo: '15 mins ago',
+    advice: 'Buses turning onto Middle Road may experience minor queuing. Consider walking to Bugis MRT (EW12/DT14) for fast transfers.',
+    lanesAffected: 'Lane 3 (Kerbside bus lane diverted)',
+    estimatedClearance: 'Until 18:00 SGT',
+    source: 'SP Group & LTA Road Operations',
   },
   {
     id: 'inc-004',
@@ -42,6 +54,10 @@ export const TRAFFIC_INCIDENTS_DATA: TrafficIncident[] = [
     affectedBuses: ['143', '167', '190'],
     delayMinutes: 11,
     reportedTimeAgo: '19 mins ago',
+    advice: 'Single-lane constriction before Penang Road turnoff. Commuters heading towards Clarke Quay can take NS23 Somerset MRT.',
+    lanesAffected: 'Lane 1 (Rightmost turn pocket)',
+    estimatedClearance: '~15 mins',
+    source: 'LTA EMAS Patrol',
   },
   {
     id: 'inc-005',
@@ -51,6 +67,10 @@ export const TRAFFIC_INCIDENTS_DATA: TrafficIncident[] = [
     affectedBuses: ['7', '77', '174'],
     delayMinutes: 6,
     reportedTimeAgo: '27 mins ago',
+    advice: 'PUB inspection team on location with directional arrow boards. Minor deceleration expected.',
+    lanesAffected: 'Lane 4 (Left lane)',
+    estimatedClearance: '~40 mins',
+    source: 'PUB & LTA Operations',
   },
   {
     id: 'inc-006',
@@ -60,6 +80,10 @@ export const TRAFFIC_INCIDENTS_DATA: TrafficIncident[] = [
     affectedBuses: ['10', '70', '196'],
     delayMinutes: 9,
     reportedTimeAgo: '32 mins ago',
+    advice: 'Volume heavy after Suntec City entrance. Commuters can transfer to CC4 Promenade MRT to bypass highway delays.',
+    lanesAffected: 'General bottleneck along southbound carriageway',
+    estimatedClearance: '~30 mins',
+    source: 'LTA Traffic Control Centre',
   },
 ];
 
