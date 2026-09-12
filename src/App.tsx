@@ -87,13 +87,13 @@ export default function App() {
             {/* Below header carousel showing latest traffic incidents */}
             <IncidentCarousel incidents={TRAFFIC_INCIDENTS_DATA} />
 
-            {/* Navigation Tabs */}
-            <div className="max-w-xl mx-auto px-4 pt-4">
+            {/* Navigation Tabs - thin, compact and less bulky */}
+            <div className="max-w-xl mx-auto px-4 pt-2.5">
               <nav
                 id="main-screen-tabs"
                 role="tablist"
                 aria-label="Main Navigation Tabs"
-                className="grid grid-cols-3 p-1.5 bg-slate-200/80 rounded-2xl border border-slate-300/80 shadow-2xs gap-1"
+                className="grid grid-cols-3 p-1 bg-slate-200/80 rounded-xl border border-slate-300/80 shadow-2xs gap-1"
               >
                 {/* Tab 1: Nearby Bus Stops */}
                 <button
@@ -103,13 +103,13 @@ export default function App() {
                   aria-selected={activeTab === 'nearby'}
                   aria-controls="tabpanel-nearby-stops"
                   onClick={() => setActiveTab('nearby')}
-                  className={`flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                  className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
                     activeTab === 'nearby'
-                      ? 'bg-white text-slate-900 shadow-xs scale-[1.01]'
-                      : 'text-slate-600 hover:text-slate-900 active:bg-slate-300/60'
+                      ? 'bg-white text-slate-900 shadow-2xs font-bold scale-[1.01]'
+                      : 'text-slate-600 hover:text-slate-900 active:bg-slate-300/50'
                   }`}
                 >
-                  <MapPin className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${activeTab === 'nearby' ? 'text-emerald-600' : 'text-slate-500'}`} />
+                  <MapPin className={`w-3.5 h-3.5 ${activeTab === 'nearby' ? 'text-emerald-600' : 'text-slate-500'}`} />
                   <span>Nearby</span>
                 </button>
 
@@ -121,14 +121,14 @@ export default function App() {
                   aria-selected={activeTab === 'favourites'}
                   aria-controls="tabpanel-favourites"
                   onClick={() => setActiveTab('favourites')}
-                  className={`flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                  className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
                     activeTab === 'favourites'
-                      ? 'bg-white text-slate-900 shadow-xs scale-[1.01]'
-                      : 'text-slate-600 hover:text-slate-900 active:bg-slate-300/60'
+                      ? 'bg-white text-slate-900 shadow-2xs font-bold scale-[1.01]'
+                      : 'text-slate-600 hover:text-slate-900 active:bg-slate-300/50'
                   }`}
                 >
                   <Star
-                    className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${
+                    className={`w-3.5 h-3.5 ${
                       activeTab === 'favourites'
                         ? 'text-amber-500 fill-amber-400'
                         : 'text-slate-500'
@@ -136,7 +136,7 @@ export default function App() {
                   />
                   <span>Favourites</span>
                   {favouriteStopCodes.length > 0 && (
-                    <span className="text-[10px] font-black bg-amber-500 text-white rounded-full px-1.5 py-0.5 leading-none">
+                    <span className="text-[9px] font-black bg-amber-500 text-white rounded-full px-1.5 py-0.5 leading-none">
                       {favouriteStopCodes.length}
                     </span>
                   )}
@@ -150,14 +150,14 @@ export default function App() {
                   aria-selected={activeTab === 'live'}
                   aria-controls="tabpanel-live-arrivals"
                   onClick={() => setActiveTab('live')}
-                  className={`flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                  className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
                     activeTab === 'live'
-                      ? 'bg-white text-slate-900 shadow-xs scale-[1.01]'
-                      : 'text-slate-600 hover:text-slate-900 active:bg-slate-300/60'
+                      ? 'bg-white text-slate-900 shadow-2xs font-bold scale-[1.01]'
+                      : 'text-slate-600 hover:text-slate-900 active:bg-slate-300/50'
                   }`}
                 >
                   <Radio
-                    className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${
+                    className={`w-3.5 h-3.5 ${
                       activeTab === 'live' ? 'text-emerald-600 animate-pulse' : 'text-slate-500'
                     }`}
                   />
