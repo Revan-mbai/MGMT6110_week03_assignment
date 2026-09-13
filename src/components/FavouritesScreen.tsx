@@ -13,6 +13,13 @@ import {
   Trash2,
   BookmarkCheck
 } from 'lucide-react';
+import {
+  normalizeStopCode,
+  isValidStopCodeFormat,
+  KNOWN_SINGAPORE_BUS_STOPS,
+  lookupBusStopDetails,
+  buildBusStopObject
+} from '../busStopsRegistry';
 
 interface FavouritesScreenProps {
   busStops: BusStop[];
@@ -52,10 +59,34 @@ export const FavouritesScreen: React.FC<FavouritesScreenProps> = ({
   const [searchErrorMessage, setSearchErrorMessage] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
 
-  // Filter ONLY bus stops that have been added by the user
-  const favouriteStops = busStops.filter((stop) =>
-    favouriteStopCodes.includes(stop.code)
-  );
+  // Combine available stops with registry stops so users can search/favourite any Singapore stop
+  const combinedDirectory = React.useMemo(() => {
+    const list: Array<{ code: string; name: string; road: string; distanceMeters?: number }> = [
+      ...allAvailableStops,
+    ];
+    const existingCodes = new Set(allAvailableStops.map((s) => s.code));
+    for (const reg of KNOWN_SINGAPORE_BUS_STOPS) {
+      if (!existingCodes.has(reg.code)) {
+        list.push({
+          code: reg.code,
+          name: reg.name,
+          road: reg.road,
+          distanceMeters: 150,
+        });
+        existingCodes.add(reg.code);
+      }
+    }
+    return list;
+  }, [allAvailableStops]);
+
+  // Resolve all favourite stops using busStops + buildBusStopObject so any added stop displays properly
+  const favouriteStops = React.useMemo(() => {
+    return favouriteStopCodes.map((code) => {
+      const existing = busStops.find((s) => s.code === code);
+      if (existing) return existing;
+      return buildBusStopObject(code) as BusStop;
+    });
+  }, [busStops, favouriteStopCodes]);
 
   const toggleStopDropdown = (code: string) => {
     setExpandedStopCode((prev) => (prev === code ? null : code));
@@ -77,26 +108,35 @@ export const FavouritesScreen: React.FC<FavouritesScreenProps> = ({
     const query = searchBusStopInput.trim();
     if (!query) return;
 
-    // Check if query exactly matches a stop code or name
-    const exactCode = allAvailableStops.find(
-      (s) => s.code.toLowerCase() === query.toLowerCase()
-    );
-    const partialMatch = allAvailableStops.find(
+    const normalized = normalizeStopCode(query);
+
+    // 1. Check if query matches a known stop code or name in directory
+    const match = combinedDirectory.find(
       (s) =>
-        s.code.toLowerCase().includes(query.toLowerCase()) ||
-        s.name.toLowerCase().includes(query.toLowerCase())
+        s.code === normalized ||
+        s.code.toLowerCase() === query.toLowerCase() ||
+        s.name.toLowerCase() === query.toLowerCase()
     );
 
-    if (!exactCode && !partialMatch) {
-      setSearchErrorMessage('bus stop code does not exist, try another code');
+    if (match) {
+      setSearchErrorMessage(null);
+      onAddFavouriteStop(match.code);
+      setSearchBusStopInput('');
+      setIsDropdownOpen(false);
       return;
     }
 
-    const codeToAdd = exactCode ? exactCode.code : partialMatch.code;
-    setSearchErrorMessage(null);
-    onAddFavouriteStop(codeToAdd);
-    setSearchBusStopInput('');
-    setIsDropdownOpen(false);
+    // 2. Check if query matches 5-digit Singapore bus stop code format
+    if (isValidStopCodeFormat(normalized)) {
+      setSearchErrorMessage(null);
+      onAddFavouriteStop(normalized);
+      setSearchBusStopInput('');
+      setIsDropdownOpen(false);
+      return;
+    }
+
+    // 3. Invalid bus stop code
+    setSearchErrorMessage('bus stop code does not exist, try another code');
   };
 
   // Search filter within favourites
@@ -211,26 +251,53 @@ export const FavouritesScreen: React.FC<FavouritesScreenProps> = ({
             >
               {(() => {
                 const q = searchBusStopInput.trim().toLowerCase();
-                const matching = allAvailableStops.filter((stop) => {
+                const normQ = normalizeStopCode(q);
+                const matching = combinedDirectory.filter((stop) => {
                   if (!q) return true;
                   return (
                     stop.code.toLowerCase().includes(q) ||
+                    stop.code.includes(normQ) ||
                     stop.name.toLowerCase().includes(q) ||
                     stop.road.toLowerCase().includes(q)
                   );
                 });
 
                 if (matching.length === 0) {
+                  if (isValidStopCodeFormat(normQ)) {
+                    return (
+                      <div
+                        id={`dropdown-stop-option-${normQ}`}
+                        onClick={() => {
+                          onAddFavouriteStop(normQ);
+                          setSearchBusStopInput('');
+                          setIsDropdownOpen(false);
+                          setSearchErrorMessage(null);
+                        }}
+                        className="p-3 hover:bg-emerald-50 cursor-pointer flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-black text-xs px-2 py-0.5 rounded bg-slate-900 text-white">
+                            {normQ}
+                          </span>
+                          <span className="text-xs font-bold text-slate-800">
+                            Add bus stop code {normQ} to favourites
+                          </span>
+                        </div>
+                        <Plus className="w-4 h-4 text-emerald-600" />
+                      </div>
+                    );
+                  }
+
                   return (
                     <div className="p-3 text-center space-y-1">
-                      <p id="search-bus-stop-dropdown-empty" className="text-xs text-rose-600 font-semibold">
-                        bus stop code does not exist, try another code
+                      <p id="search-bus-stop-dropdown-empty" className="text-xs text-slate-500 font-medium">
+                        Search by bus stop code (e.g. 04121, 09048, 10169) or road name
                       </p>
                     </div>
                   );
                 }
 
-                return matching.map((stop) => {
+                return matching.slice(0, 15).map((stop) => {
                   const isAlreadyAdded = favouriteStopCodes.includes(stop.code);
                   return (
                     <div

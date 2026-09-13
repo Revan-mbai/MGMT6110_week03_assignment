@@ -8,6 +8,14 @@ import { LiveBusArrivalPanel } from './components/LiveBusArrivalPanel';
 import { BUS_STOPS_DATA, TRAFFIC_INCIDENTS_DATA } from './data';
 import { BusStop } from './types';
 import { MapPin, Radio, Star } from 'lucide-react';
+import { KNOWN_SINGAPORE_BUS_STOPS, buildBusStopObject } from './busStopsRegistry';
+
+const ALL_BUS_STOPS: BusStop[] = [
+  ...BUS_STOPS_DATA,
+  ...KNOWN_SINGAPORE_BUS_STOPS
+    .filter((k) => !BUS_STOPS_DATA.some((b) => b.code === k.code))
+    .map((k) => buildBusStopObject(k.code) as BusStop),
+];
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<'stops' | 'arrivals'>('stops');
@@ -170,7 +178,7 @@ export default function App() {
             {activeTab === 'nearby' && (
               <div id="tabpanel-nearby-stops" role="tabpanel" aria-labelledby="tab-nearby-stops">
                 <NearbyStopsScreen
-                  busStops={BUS_STOPS_DATA}
+                  busStops={ALL_BUS_STOPS}
                   onSelectStop={handleSelectStop}
                   favouriteStopCodes={favouriteStopCodes}
                   onToggleFavourite={handleToggleFavourite}
@@ -182,8 +190,8 @@ export default function App() {
             {activeTab === 'favourites' && (
               <div id="tabpanel-favourites" role="tabpanel" aria-labelledby="tab-favourites">
                 <FavouritesScreen
-                  busStops={BUS_STOPS_DATA}
-                  allAvailableStops={BUS_STOPS_DATA}
+                  busStops={ALL_BUS_STOPS}
+                  allAvailableStops={ALL_BUS_STOPS}
                   favouriteStopCodes={favouriteStopCodes}
                   onToggleFavourite={handleToggleFavourite}
                   onAddFavouriteStop={handleAddFavourite}

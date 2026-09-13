@@ -1,78 +1,20 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Radio, 
   RefreshCw, 
-  AlertCircle, 
   Clock, 
-  CheckCircle2, 
-  Bus as BusIcon, 
-  Info,
+  MapPin,
   ShieldAlert,
-  MapPin
 } from 'lucide-react';
-import { BUS_STOPS_DATA } from '../data';
-
-// Known Singapore bus stop directory for names and addresses
-const KNOWN_BUS_STOPS: Record<string, { name: string; road: string; address: string }> = {
-  '04121': {
-    name: 'Opp City Hall Complex',
-    road: 'North Bridge Rd',
-    address: 'North Bridge Road, Singapore 179098',
-  },
-  '09048': {
-    name: 'Opp Orchard Boulevard Stn',
-    road: 'Orchard Blvd',
-    address: 'Orchard Boulevard, Singapore 248649',
-  },
-  '08057': {
-    name: 'Somerset Station Gate B',
-    road: 'Somerset Rd',
-    address: 'Somerset Road, Singapore 238162',
-  },
-  '08031': {
-    name: 'Dhoby Ghaut Station Plaza',
-    road: 'Orchard Rd',
-    address: 'Orchard Road, Singapore 238826',
-  },
-  '01012': {
-    name: 'Bugis Junction North',
-    road: 'Victoria St',
-    address: 'Victoria Street, Singapore 188067',
-  },
-  '03019': {
-    name: 'Raffles Place Promenade',
-    road: 'Collyer Quay',
-    address: 'Collyer Quay, Singapore 049318',
-  },
-  '02049': {
-    name: 'Suntec City / Promenade Stn',
-    road: 'Temasek Blvd',
-    address: 'Temasek Boulevard, Singapore 038983',
-  },
-  '10169': {
-    name: 'HarbourFront Stn / Vivocity',
-    road: 'Telok Blangah Rd',
-    address: 'Telok Blangah Road, Singapore 099419',
-  },
-};
+import { 
+  normalizeStopCode, 
+  isValidStopCodeFormat, 
+  lookupBusStopDetails, 
+  KNOWN_SINGAPORE_BUS_STOPS 
+} from '../busStopsRegistry';
 
 export function getBusStopInfo(code: string): { name: string; road: string; address: string } {
-  if (KNOWN_BUS_STOPS[code]) {
-    return KNOWN_BUS_STOPS[code];
-  }
-  const match = BUS_STOPS_DATA.find((s) => s.code === code);
-  if (match) {
-    return {
-      name: match.name,
-      road: match.road,
-      address: `${match.road}, Singapore`,
-    };
-  }
-  return {
-    name: `Bus Stop ${code}`,
-    road: 'Singapore Public Bus Network',
-    address: `Bus Stop Code ${code}, Singapore`,
-  };
+  return lookupBusStopDetails(code);
 }
 
 interface LiveServiceArrival {
@@ -84,7 +26,9 @@ interface LiveApiResponse {
   BusStopCode?: string;
   services?: LiveServiceArrival[];
   error?: string;
+  notFound?: boolean;
   upstreamStatus?: number;
+  isSimulated?: boolean;
 }
 
 interface LiveBusArrivalPanelProps {
@@ -120,6 +64,7 @@ export const LiveBusArrivalPanel: React.FC<LiveBusArrivalPanelProps> = ({
     { code: '08057', label: 'Somerset (08057)' },
     { code: '08031', label: 'Dhoby Ghaut (08031)' },
     { code: '01012', label: 'Bugis (01012)' },
+    { code: '10169', label: 'HarbourFront (10169)' },
   ];
 
   // Fetch from /api/bus (shared serverless handler)
@@ -132,15 +77,22 @@ export const LiveBusArrivalPanel: React.FC<LiveBusArrivalPanelProps> = ({
       const data: LiveApiResponse = await res.json();
 
       if (!res.ok) {
-        if (res.status === 503) {
+        if (res.status === 404 || data.notFound) {
+          setInputError('bus stop code does not exist, try another code');
+          setErrorNotice(null);
+          setServices([]);
+        } else if (res.status === 503) {
           setErrorNotice(data.error || 'LTA_ACCOUNT_KEY is not set. Add it in Vercel and redeploy.');
+          setServices([]);
         } else {
           setErrorNotice(
             data.error || `Upstream returned status ${data.upstreamStatus || res.status}.`
           );
+          setServices([]);
         }
-        setServices([]);
       } else {
+        // Valid arrivals returned: stop code exists, clear any error
+        setInputError(null);
         setServices(Array.isArray(data.services) ? data.services : []);
         setErrorNotice(null);
       }
@@ -183,6 +135,7 @@ export const LiveBusArrivalPanel: React.FC<LiveBusArrivalPanelProps> = ({
     if (currentStopCode && currentStopCode !== activeStopCode) {
       setStopCodeInput(currentStopCode);
       setActiveStopCode(currentStopCode);
+      setInputError(null);
     }
   }, [currentStopCode]);
 
@@ -204,25 +157,24 @@ export const LiveBusArrivalPanel: React.FC<LiveBusArrivalPanelProps> = ({
     return () => clearInterval(intervalTimer);
   }, [activeStopCode]);
 
-  const isKnownStop = Boolean(
-    KNOWN_BUS_STOPS[activeStopCode] || BUS_STOPS_DATA.some((s) => s.code === activeStopCode)
-  );
-
   const handleApplyStopCode = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const clean = stopCodeInput.trim();
-    if (clean) {
-      const exists = Boolean(
-        KNOWN_BUS_STOPS[clean] || BUS_STOPS_DATA.some((s) => s.code === clean)
-      );
-      if (!exists) {
-        setInputError('bus stop code does not exist, try another code');
-      } else {
-        setInputError(null);
-      }
-      setActiveStopCode(clean);
-      if (onSelectStopCode) onSelectStopCode(clean);
+    const raw = stopCodeInput.trim();
+    if (!raw) return;
+
+    const normalized = normalizeStopCode(raw);
+
+    // Format check: Singapore bus stop codes must be 5 numeric digits
+    if (!isValidStopCodeFormat(normalized)) {
+      setInputError('bus stop code does not exist, try another code');
+      return;
     }
+
+    // Stop code has valid format: clear previous errors and fetch
+    setInputError(null);
+    setStopCodeInput(normalized);
+    setActiveStopCode(normalized);
+    if (onSelectStopCode) onSelectStopCode(normalized);
   };
 
   // Helper to format arrival minutes
@@ -347,6 +299,7 @@ export const LiveBusArrivalPanel: React.FC<LiveBusArrivalPanelProps> = ({
               type="button"
               id={`quick-stop-chip-${item.code}`}
               onClick={() => {
+                setInputError(null);
                 setStopCodeInput(item.code);
                 setActiveStopCode(item.code);
                 if (onSelectStopCode) onSelectStopCode(item.code);
@@ -430,15 +383,11 @@ export const LiveBusArrivalPanel: React.FC<LiveBusArrivalPanelProps> = ({
           /* Empty services array treated as "no buses running", showing a plain sentence */
           <div id="no-services-running-sentence" className="py-6 px-4 bg-slate-50 rounded-xl text-center border border-slate-200">
             <p className="text-sm font-semibold text-slate-700">
-              {!isKnownStop
-                ? 'bus stop code does not exist, try another code'
-                : `No buses currently running for ${stopInfo.name} (${activeStopCode}).`}
+              No buses currently running for {stopInfo.name} ({activeStopCode}).
             </p>
-            {isKnownStop && (
-              <p className="text-xs text-slate-400 mt-1">
-                Bus services may not be in operation at this hour or currently scheduled.
-              </p>
-            )}
+            <p className="text-xs text-slate-400 mt-1">
+              Bus services may not be in operation at this hour or currently scheduled.
+            </p>
           </div>
         ) : (
           <div id="live-services-grid" className="space-y-2.5">
