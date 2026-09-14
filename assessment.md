@@ -89,3 +89,29 @@ Test and pass condition: Document each source's update interval or justify an un
 Evidence: Ten checks of the same stop within 20 seconds made only one request to the provider. Later checks and different stops fetched fresh information. Advisory slides changed every five seconds, but their information-refresh frequency remained unverified.
 
 Mark: Met
+
+
+Q1 — Where did the agent make you faster?
+
+The biggest time saving came from debugging. For example, when the Favourites feature created an error, the agent traced the problem to one button being placed inside another button and fixed it. It also diagnosed why desktop click-and-drag on the traffic advisory was not working and changed it so that dragging continued even when the cursor moved outside the card. Finding these bugs myself would have taken much longer because I would not have been able to find the error.
+
+Q2 — Where did it cost you time?
+
+The biggest loss of time came from the invalid bus-stop validation. I asked for an error message only when a code did not exist, but after the change, the message appeared for both valid and invalid codes. I had to test it, identify that the behaviour was wrong, and send another prompt. AI studio fixed the validation across six files.
+
+Q3 — Did it ever hand you something that looked right and was not?
+
+Yes. The first version of the invalid bus-stop feature looked correct because the agent reported that all three search areas now showed the right message when a code did not exist. I only discovered the problem by testing the app myself and seeing the same error message for valid codes. The explanation sounded convincing, but the actual behaviour was wrong.
+
+Q4 — What did you have to know to supervise it?
+
+I needed to understand the expected behaviour well enough to know when the code was wrong. I did not need to know exactly how the validation was written, but I knew that a valid bus-stop code should show arrivals and an invalid one should show an error. I also had to understand that a clean build does not prove that a feature works correctly. Without testing the actual user flow, I would not have caught the validation mistake.
+
+Q5 — Which decisions did you keep?
+
+I kept the main product decisions, such as how users should search for stops, how advisories should behave, and what error messages should appear. I let the agent handle most of the technical debugging, including the nested-button error, click-and-drag problem and validation logic. I think that was the right boundary. I should decide what the user should experience, while the agent can investigate how to fix the code. However, I still need to test the result because the validation issue showed that the agent can report success even when the behaviour is still wrong.
+
+Q6 — What would this mean for a team of thirty?
+
+For a team of thirty, I would let agents handle first-pass debugging and suggest technical fixes, but I would require a human to reproduce the bug before the fix and test the exact same case afterwards. A successful build would not be enough to close an issue. Every bug should have a short record of the original problem, the cause, the change made and the test that proved it was fixed. I would especially require this for validation, security and user-facing error messages, because my project showed that code can compile successfully while still behaving incorrectly.
+
