@@ -58,9 +58,9 @@ Why it matters: Late-night users must not mistake missing information for an arr
 
 Test and pass condition: Inspect real empty responses and test-controlled cases. Empty lists need accurate messages; missing times must not become zero. An arrival at 00:03 tomorrow, checked at 23:58 Singapore time, must show about five minutes. Distinguish observed from simulated cases.
 
-Evidence: Evidence: Simulated tests handled missing arrivals and empty advisories without crashing and correctly calculated a five-minute wait across midnight. However, “No buses currently running” could mislead users when information is simply unavailable.
+Evidence: only shows the last bus but does not state that there are no more buses running afterwards.
 
-Mark: Met
+Mark: Not met
  
 BE2 - Health and diagnosis
 
