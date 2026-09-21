@@ -12,7 +12,7 @@ declare global {
   }
 }
 
-const DISQUS_SHORTNAME = 'sgbusTracker';
+const DISQUS_SHORTNAME = 'sgbustracker';
 const PAGE_URL = 'https://mgmt-6110-week03-assignment.vercel.app/';
 const PAGE_IDENTIFIER = 'home';
 const SCRIPT_ID = 'disqus-embed-script';
