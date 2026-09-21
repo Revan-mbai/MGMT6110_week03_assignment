@@ -79,6 +79,10 @@ const NON_EXISTENT_CODES = new Set([
   '00001',
 ]);
 
+// In-memory cache for bus arrival responses (20s TTL matching LTA DataMall refresh frequency)
+const busArrivalCache = new Map();
+const CACHE_TTL_MS = 20000;
+
 export default async function handler(req, res) {
   // Extract BusStopCode query parameter with default to '04121'
   let rawCode = '04121';
@@ -109,12 +113,24 @@ export default async function handler(req, res) {
     });
   }
 
+  // Check in-memory cache first (20s TTL)
+  const cached = busArrivalCache.get(busStopCode);
+  const nowMs = Date.now();
+  if (cached && (nowMs - cached.timestamp < CACHE_TTL_MS)) {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('X-Cache', 'HIT');
+    res.setHeader('Cache-Control', 's-maxage=20, stale-while-revalidate=40');
+    return res.status(200).json(cached.data);
+  }
+
   // Read credential from environment variable
   const ltaKey = process.env.LTA_ACCOUNT_KEY;
 
   // If LTA_ACCOUNT_KEY is not configured, provide simulated fallback for valid stops
   if (!ltaKey || typeof ltaKey !== 'string' || !ltaKey.trim()) {
     res.setHeader('Content-Type', 'application/json');
+    res.setHeader('X-Cache', 'MISS');
+    res.setHeader('Cache-Control', 's-maxage=20, stale-while-revalidate=40');
 
     // If it's a known simulated stop or valid Singapore 5-digit stop, return arrival times
     const servicesList = SIMULATED_STOPS_SERVICES[busStopCode] || ['14', '65', '106'];
@@ -129,11 +145,14 @@ export default async function handler(req, res) {
       };
     });
 
-    return res.status(200).json({
+    const payload = {
       BusStopCode: busStopCode,
       services: services,
       isSimulated: true,
-    });
+    };
+
+    busArrivalCache.set(busStopCode, { data: payload, timestamp: nowMs });
+    return res.status(200).json(payload);
   }
 
   const endpoint = `https://datamall2.mytransport.sg/ltaodataservice/v3/BusArrival?BusStopCode=${encodeURIComponent(busStopCode)}`;
@@ -201,12 +220,17 @@ export default async function handler(req, res) {
       };
     });
 
-    // Set cache header as LTA refreshes every 20 seconds
-    res.setHeader('Cache-Control', 's-maxage=20, stale-while-revalidate=40');
-    return res.status(200).json({
+    const payload = {
       BusStopCode: busStopCode,
       services: services,
-    });
+    };
+
+    busArrivalCache.set(busStopCode, { data: payload, timestamp: nowMs });
+
+    // Set cache header as LTA refreshes every 20 seconds
+    res.setHeader('X-Cache', 'MISS');
+    res.setHeader('Cache-Control', 's-maxage=20, stale-while-revalidate=40');
+    return res.status(200).json(payload);
   } catch (err) {
     return res.status(502).json({
       upstreamStatus: 502,

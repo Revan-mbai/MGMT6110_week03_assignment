@@ -9,6 +9,27 @@
     <meta property="og:description" content="Real-time bus arrival tracking and traffic incident monitoring for Singapore bus commuters." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+    <script>
+      // Suppress cross-origin third-party script errors (e.g. Disqus embed, ad-blockers)
+      window.addEventListener('error', function (event) {
+        if (
+          event.message === 'Script error.' ||
+          (typeof event.filename === 'string' && event.filename.indexOf('disqus') !== -1)
+        ) {
+          if (event.preventDefault) event.preventDefault();
+          if (event.stopPropagation) event.stopPropagation();
+          return true;
+        }
+      }, true);
+      window.onerror = function (message, source) {
+        if (
+          message === 'Script error.' ||
+          (typeof source === 'string' && source.indexOf('disqus') !== -1)
+        ) {
+          return true;
+        }
+      };
+    </script>
   </head>
   <body>
     <div id="root"></div>

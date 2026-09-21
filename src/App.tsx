@@ -5,6 +5,7 @@ import { NearbyStopsScreen } from './components/NearbyStopsScreen';
 import { FavouritesScreen } from './components/FavouritesScreen';
 import { BusStopDetailScreen } from './components/BusStopDetailScreen';
 import { LiveBusArrivalPanel } from './components/LiveBusArrivalPanel';
+import { DisqusComments } from './components/DisqusComments';
 import { BUS_STOPS_DATA, TRAFFIC_INCIDENTS_DATA } from './data';
 import { BusStop } from './types';
 import { MapPin, Radio, Star } from 'lucide-react';
@@ -210,6 +211,9 @@ export default function App() {
                 />
               </div>
             )}
+
+            {/* Disqus Community Feedback - Main Page Only */}
+            <DisqusComments />
           </>
         )}
 
