@@ -1,6 +1,69 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <script>
+      (function () {
+        function isBenignScriptError(msg, source) {
+          if (!msg) return true;
+          if (typeof msg === 'string' && msg.indexOf('Script error') !== -1) return true;
+          if (typeof source === 'string' && source.indexOf('disqus') !== -1) return true;
+          return false;
+        }
+
+        // Intercept capture-phase error events from external third-party widgets
+        window.addEventListener(
+          'error',
+          function (event) {
+            if (
+              isBenignScriptError(event.message, event.filename) ||
+              (event.target && event.target.tagName === 'SCRIPT')
+            ) {
+              if (event.preventDefault) event.preventDefault();
+              if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+              return true;
+            }
+          },
+          true
+        );
+
+        // Wrap addEventListener so downstream listeners do not report external script errors
+        var originalAddEventListener = window.addEventListener;
+        window.addEventListener = function (type, listener, options) {
+          if (type === 'error' && typeof listener === 'function') {
+            var wrappedListener = function (event) {
+              if (
+                isBenignScriptError(event.message, event.filename) ||
+                (event.target && event.target.tagName === 'SCRIPT')
+              ) {
+                return;
+              }
+              return listener.apply(this, arguments);
+            };
+            return originalAddEventListener.call(this, type, wrappedListener, options);
+          }
+          return originalAddEventListener.apply(this, arguments);
+        };
+
+        // Ensure window.onerror also filters out external Script errors
+        var _onerror = null;
+        Object.defineProperty(window, 'onerror', {
+          get: function () {
+            return _onerror;
+          },
+          set: function (fn) {
+            _onerror = function (message, source, lineno, colno, error) {
+              if (isBenignScriptError(message, source)) {
+                return true;
+              }
+              if (typeof fn === 'function') {
+                return fn(message, source, lineno, colno, error);
+              }
+            };
+          },
+          configurable: true,
+        });
+      })();
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SG Bus Tracker</title>
@@ -9,27 +72,6 @@
     <meta property="og:description" content="Real-time bus arrival tracking and traffic incident monitoring for Singapore bus commuters." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
-    <script>
-      // Suppress cross-origin third-party script errors (e.g. Disqus embed, ad-blockers)
-      window.addEventListener('error', function (event) {
-        if (
-          event.message === 'Script error.' ||
-          (typeof event.filename === 'string' && event.filename.indexOf('disqus') !== -1)
-        ) {
-          if (event.preventDefault) event.preventDefault();
-          if (event.stopPropagation) event.stopPropagation();
-          return true;
-        }
-      }, true);
-      window.onerror = function (message, source) {
-        if (
-          message === 'Script error.' ||
-          (typeof source === 'string' && source.indexOf('disqus') !== -1)
-        ) {
-          return true;
-        }
-      };
-    </script>
   </head>
   <body>
     <div id="root"></div>

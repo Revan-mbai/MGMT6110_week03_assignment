@@ -22,15 +22,16 @@ export function DisqusComments() {
     // Intercept and suppress cross-origin Script errors originating from third-party widgets
     const handleScriptError = (event: ErrorEvent) => {
       if (
-        event.message === 'Script error.' ||
+        !event.message ||
+        event.message.indexOf('Script error') !== -1 ||
         (typeof event.filename === 'string' && event.filename.includes('disqus'))
       ) {
-        event.preventDefault();
-        event.stopPropagation();
+        if (event.preventDefault) event.preventDefault();
+        if (event.stopImmediatePropagation) event.stopImmediatePropagation();
         return true;
       }
     };
-    window.addEventListener('error', handleScriptError);
+    window.addEventListener('error', handleScriptError, true);
 
     // Set fallback global variables for Disqus legacy compatibility
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -85,7 +86,7 @@ export function DisqusComments() {
     }
 
     return () => {
-      window.removeEventListener('error', handleScriptError);
+      window.removeEventListener('error', handleScriptError, true);
     };
   }, []);
 
