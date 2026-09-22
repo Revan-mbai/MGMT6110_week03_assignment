@@ -235,10 +235,40 @@ export default function App() {
         )}
       </div>
 
-      {/* Mandatory Licence Footer */}
-      <footer id="app-licence-footer" className="max-w-xl mx-auto px-4 pt-8 pb-4 text-center">
+      {/* Mandatory Licence & Privacy Footer */}
+      <footer id="app-licence-footer" className="max-w-xl mx-auto px-4 pt-8 pb-4 text-center space-y-3">
         <p className="text-xs text-slate-500 leading-relaxed font-normal">
           Contains information from LTA DataMall Bus Arrival, accessed {accessedDateString}, made available under the terms of the Singapore Open Data Licence version 1.0, data.gov.sg/open-data-licence.
+        </p>
+        <p id="app-privacy-notice" className="text-xs text-slate-500 leading-relaxed font-normal">
+          This page uses Microsoft Clarity and Disqus, which use cookies to record how visitors use the site and to host comments. By using this page you agree that we and Microsoft may collect and use this data. See the{' '}
+          <a
+            href="https://www.microsoft.com/privacy/privacystatement"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-slate-700"
+          >
+            Microsoft Privacy Statement
+          </a>
+          , the{' '}
+          <a
+            href="https://disqus.com/privacy-policy/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-slate-700"
+          >
+            Disqus privacy policy
+          </a>{' '}
+          and the{' '}
+          <a
+            href="https://disqus.com/data-sharing-settings/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-slate-700"
+          >
+            Disqus data sharing settings
+          </a>
+          .
         </p>
       </footer>
     </div>
