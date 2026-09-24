@@ -4,6 +4,7 @@ import {
   Star,
   MapPin,
   ChevronDown,
+  ChevronUp,
   AlertTriangle,
   ArrowRight,
   Plus,
@@ -52,6 +53,8 @@ export const FavouritesScreen: React.FC<FavouritesScreenProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedStopCode, setExpandedStopCode] = useState<string | null>(null);
+  const [showAllStops, setShowAllStops] = useState(false);
+  const [showAllNearbyChips, setShowAllNearbyChips] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [selectedMapStopCode, setSelectedMapStopCode] = useState<string | null>(null);
   const [searchBusStopInput, setSearchBusStopInput] = useState<string>('');
@@ -149,6 +152,10 @@ export const FavouritesScreen: React.FC<FavouritesScreenProps> = ({
     const matchesBus = stop.busServices.some((b) => b.toLowerCase().includes(q));
     return matchesCode || matchesName || matchesRoad || matchesBus;
   });
+
+  const displayedFavouriteStops = showAllStops
+    ? filteredFavouriteStops
+    : filteredFavouriteStops.slice(0, 5);
 
   const selectedMapStop =
     favouriteStops.find((s) => s.code === selectedMapStopCode) || filteredFavouriteStops[0];
@@ -354,7 +361,7 @@ export const FavouritesScreen: React.FC<FavouritesScreenProps> = ({
             Nearby bus stop:
           </span>
           <div className="flex flex-wrap gap-1.5">
-            {allAvailableStops.map((stop) => {
+            {(showAllNearbyChips ? allAvailableStops : allAvailableStops.slice(0, 5)).map((stop) => {
               const isAlreadyAdded = favouriteStopCodes.includes(stop.code);
               return (
                 <button
@@ -388,6 +395,23 @@ export const FavouritesScreen: React.FC<FavouritesScreenProps> = ({
                 </button>
               );
             })}
+
+            {allAvailableStops.length > 5 && (
+              <button
+                type="button"
+                id={showAllNearbyChips ? 'nearby-chips-show-less-btn' : 'nearby-chips-show-more-btn'}
+                onClick={() => setShowAllNearbyChips(!showAllNearbyChips)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-300 transition-colors"
+                aria-label={showAllNearbyChips ? 'Show less bus stops' : 'Show more bus stops'}
+              >
+                <span>{showAllNearbyChips ? 'Show less' : 'Show more'}</span>
+                {showAllNearbyChips ? (
+                  <ChevronUp className="w-3 h-3 text-slate-500" />
+                ) : (
+                  <ChevronDown className="w-3 h-3 text-slate-500" />
+                )}
+              </button>
+            )}
           </div>
         </div>
       </section>
@@ -399,7 +423,10 @@ export const FavouritesScreen: React.FC<FavouritesScreenProps> = ({
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setShowAllStops(false);
+            }}
             placeholder="Search within your favourites..."
             className="w-full bg-white border border-slate-300 rounded-xl pl-10 pr-4 py-2 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-xs"
           />
@@ -439,7 +466,7 @@ export const FavouritesScreen: React.FC<FavouritesScreenProps> = ({
       {/* VIEW 1: List of Added Favourites */}
       {viewMode === 'list' && favouriteStops.length > 0 && (
         <div id="favourite-stops-list" className="space-y-3">
-          {filteredFavouriteStops.map((stop) => {
+          {displayedFavouriteStops.map((stop) => {
             const isExpanded = expandedStopCode === stop.code;
             const hasDelayedBus = stop.buses.some((b) => b.isDelayed);
 
@@ -573,6 +600,23 @@ export const FavouritesScreen: React.FC<FavouritesScreenProps> = ({
               </div>
             );
           })}
+
+          {filteredFavouriteStops.length > 5 && (
+            <button
+              type="button"
+              id={showAllStops ? 'fav-show-less-stops-btn' : 'fav-show-more-stops-btn'}
+              onClick={() => setShowAllStops(!showAllStops)}
+              className="w-full py-3 px-4 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200/90 text-slate-700 hover:text-slate-900 font-bold text-sm shadow-xs transition-colors flex items-center justify-center gap-2"
+              aria-label={showAllStops ? 'Show less favourite bus stops' : 'Show more favourite bus stops'}
+            >
+              <span>{showAllStops ? 'Show less' : 'Show more'}</span>
+              {showAllStops ? (
+                <ChevronUp className="w-4 h-4 text-slate-500" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-slate-500" />
+              )}
+            </button>
+          )}
         </div>
       )}
 

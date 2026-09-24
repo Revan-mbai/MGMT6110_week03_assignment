@@ -5,6 +5,7 @@ import {
   Navigation, 
   Search, 
   ChevronDown, 
+  ChevronUp,
   AlertTriangle, 
   ArrowRight,
   Star
@@ -25,6 +26,7 @@ export const NearbyStopsScreen: React.FC<NearbyStopsScreenProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedStopCode, setExpandedStopCode] = useState<string | null>(null);
+  const [showAllStops, setShowAllStops] = useState(false);
 
   const toggleStopDropdown = (code: string) => {
     setExpandedStopCode((prev) => (prev === code ? null : code));
@@ -39,6 +41,8 @@ export const NearbyStopsScreen: React.FC<NearbyStopsScreenProps> = ({
     const matchesBus = stop.busServices.some((b) => b.toLowerCase().includes(q));
     return matchesCode || matchesName || matchesRoad || matchesBus;
   });
+
+  const displayedStops = showAllStops ? filteredStops : filteredStops.slice(0, 5);
 
   return (
     <main
@@ -74,14 +78,20 @@ export const NearbyStopsScreen: React.FC<NearbyStopsScreenProps> = ({
             id="bus-stop-search-input"
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setShowAllStops(false);
+            }}
             placeholder="Search by bus no., stop name, or code (e.g. 14, Orchard, 09048)..."
             className="w-full bg-white border border-slate-300 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 shadow-xs"
           />
           {searchQuery && (
             <button
               id="clear-search-btn"
-              onClick={() => setSearchQuery('')}
+              onClick={() => {
+                setSearchQuery('');
+                setShowAllStops(false);
+              }}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400 hover:text-slate-600 p-1"
             >
               Clear
@@ -108,14 +118,18 @@ export const NearbyStopsScreen: React.FC<NearbyStopsScreenProps> = ({
                   : 'Try searching for a different bus number, road, or stop code.'}
               </p>
               <button
-                onClick={() => setSearchQuery('')}
+                onClick={() => {
+                  setSearchQuery('');
+                  setShowAllStops(false);
+                }}
                 className="mt-2 text-xs font-bold text-emerald-600 hover:text-emerald-700 underline"
               >
                 Reset Search
               </button>
             </div>
           ) : (
-            filteredStops.map((stop) => {
+            <>
+              {displayedStops.map((stop) => {
               const isExpanded = expandedStopCode === stop.code;
               const hasDelayedBus = stop.buses.some((b) => b.isDelayed);
               return (
@@ -275,9 +289,27 @@ export const NearbyStopsScreen: React.FC<NearbyStopsScreenProps> = ({
                   )}
                 </div>
               );
-            })
-          )}
-        </div>
+            })}
+
+            {filteredStops.length > 5 && (
+              <button
+                type="button"
+                id={showAllStops ? 'show-less-stops-btn' : 'show-more-stops-btn'}
+                onClick={() => setShowAllStops(!showAllStops)}
+                className="w-full py-3 px-4 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200/90 text-slate-700 hover:text-slate-900 font-bold text-sm shadow-xs transition-colors flex items-center justify-center gap-2"
+                aria-label={showAllStops ? 'Show less bus stops' : 'Show more bus stops'}
+              >
+                <span>{showAllStops ? 'Show less' : 'Show more'}</span>
+                {showAllStops ? (
+                  <ChevronUp className="w-4 h-4 text-slate-500" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-slate-500" />
+                )}
+              </button>
+            )}
+          </>
+        )}
+      </div>
     </main>
   );
 };

@@ -1,5 +1,22 @@
 @import "tailwindcss";
 
+:root,
+html,
+body {
+  color-scheme: light;
+}
+
+/* Ensure color scheme compatibility for Disqus embedded discussion */
+#disqus_thread {
+  color-scheme: light;
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
+#disqus_thread a {
+  color: #059669;
+}
+
 /* Hide scrollbars across all browsers while keeping page and containers scrollable */
 *::-webkit-scrollbar {
   display: none;
