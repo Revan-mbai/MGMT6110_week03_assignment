@@ -99,31 +99,7 @@ export function buildBusStopObject(code: string): BusStop {
     longitude: 103.825,
     distanceMeters: 200,
     walkingTimeMins: 3,
-    busServices: ['14', '65', '106'],
-    buses: [
-      {
-        busNumber: '14',
-        destination: 'Bedok Int',
-        isDelayed: false,
-        nextBus: {
-          arrivalMinutes: 3,
-          load: 'Seats Available',
-          type: 'Double Deck',
-          wheelchairAccessible: true,
-        },
-        subsequentBus: {
-          arrivalMinutes: 10,
-          load: 'Standing Available',
-          type: 'Single Deck',
-          wheelchairAccessible: true,
-        },
-        thirdBus: {
-          arrivalMinutes: 18,
-          load: 'Seats Available',
-          type: 'Double Deck',
-          wheelchairAccessible: true,
-        },
-      },
-    ],
+    busServices: [],
+    buses: [],
   };
 }

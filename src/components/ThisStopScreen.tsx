@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { BusStop, BusArrivalInfo, TrafficIncident } from '../types';
 import { getDistanceInMeters } from '../data';
 import {
@@ -10,7 +10,8 @@ import {
   AlertTriangle,
   Info,
   CheckCircle2,
-  Radio
+  Radio,
+  Loader2
 } from 'lucide-react';
 
 interface ThisStopScreenProps {
@@ -18,6 +19,7 @@ interface ThisStopScreenProps {
   onBackToStops: () => void;
   savedStopCodes: string[];
   onToggleSaveStop: (code: string) => void;
+  allBusStops?: BusStop[];
 }
 
 interface IncidentsApiResponse {
@@ -33,9 +35,14 @@ export const ThisStopScreen: React.FC<ThisStopScreenProps> = ({
   onBackToStops,
   savedStopCodes,
   onToggleSaveStop,
+  allBusStops = [],
 }) => {
-  // Live arrival state
-  const [busesData, setBusesData] = useState<BusArrivalInfo[]>(selectedStop.buses);
+  // Live arrival state from LTA DataMall BusArrivalv2
+  const [busesData, setBusesData] = useState<BusArrivalInfo[]>([]);
+  const [isArrivalsUnavailable, setIsArrivalsUnavailable] = useState<boolean>(false);
+  const [lastSucceededTime, setLastSucceededTime] = useState<string | null>(null);
+  const [isLoadingArrivals, setIsLoadingArrivals] = useState<boolean>(true);
+
   const [secondsUntilRefresh, setSecondsUntilRefresh] = useState<number>(20);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [lastRefreshedTime, setLastRefreshedTime] = useState<string>(() => {
@@ -88,19 +95,145 @@ export const ThisStopScreen: React.FC<ThisStopScreenProps> = ({
     return () => clearInterval(clockTimer);
   }, []);
 
-  // Synchronize busesData when selectedStop changes
+  // Helper to resolve human-readable destination from DestinationCode
+  const lookupDestinationName = useCallback(
+    (destinationCode?: string) => {
+      if (!destinationCode) return 'Loop / Terminal';
+      const found = allBusStops.find((s) => s.code === destinationCode);
+      if (found) {
+        return found.name;
+      }
+      return `Stop ${destinationCode}`;
+    },
+    [allBusStops]
+  );
+
+  // Fetch real arrivals from LTA DataMall BusArrivalv2 (/api/bus?BusStopCode=<code>)
+  const fetchLiveArrivals = useCallback(
+    async (isManual = false) => {
+      if (isManual) setIsRefreshing(true);
+
+      try {
+        const res = await fetch(`/api/bus?BusStopCode=${encodeURIComponent(selectedStop.code)}`);
+        const data = await res.json();
+
+        if (!res.ok || data.isUnavailable) {
+          setIsArrivalsUnavailable(true);
+          return;
+        }
+
+        const nowTime = new Date().toLocaleTimeString('en-SG', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false,
+        });
+
+        setIsArrivalsUnavailable(false);
+        setLastRefreshedTime(nowTime);
+        setLastSucceededTime(nowTime);
+
+        const returnedServices: Array<{
+          ServiceNo: string;
+          Operator?: string;
+          nextBus?: any;
+          subsequentBus?: any;
+          thirdBus?: any;
+          noThirdArrivalReason?: string;
+        }> = Array.isArray(data.services) ? data.services : [];
+
+        // Build a map of returned services
+        const apiMap = new Map<string, (typeof returnedServices)[0]>();
+        for (const s of returnedServices) {
+          if (s.ServiceNo) {
+            apiMap.set(s.ServiceNo, s);
+          }
+        }
+
+        // Combine services known for this stop (from BusRoutes) with any live returned services
+        const combinedServiceNos = new Set<string>();
+        if (Array.isArray(selectedStop.busServices)) {
+          for (const svc of selectedStop.busServices) {
+            if (svc) combinedServiceNos.add(svc);
+          }
+        }
+        for (const s of returnedServices) {
+          if (s.ServiceNo) combinedServiceNos.add(s.ServiceNo);
+        }
+
+        // Sort naturally
+        const sortedServiceNos = Array.from(combinedServiceNos).sort((a, b) => {
+          const numA = parseInt(a, 10);
+          const numB = parseInt(b, 10);
+          if (!isNaN(numA) && !isNaN(numB) && numA !== numB) {
+            return numA - numB;
+          }
+          return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+        });
+
+        const formattedList: BusArrivalInfo[] = sortedServiceNos.map((svcNo) => {
+          const match = apiMap.get(svcNo);
+
+          if (match) {
+            const nextBus = match.nextBus || undefined;
+            const subsequentBus = match.subsequentBus || undefined;
+            const thirdBus = match.thirdBus || undefined;
+
+            let noThirdArrivalReason = match.noThirdArrivalReason;
+            if (nextBus && subsequentBus && !thirdBus) {
+              noThirdArrivalReason = 'Only two arrivals scheduled';
+            } else if (nextBus && !subsequentBus) {
+              noThirdArrivalReason = 'No more buses tonight (last bus in service)';
+            } else if (!nextBus) {
+              noThirdArrivalReason = 'No more buses tonight (last bus in service)';
+            }
+
+            const destCode =
+              nextBus?.destinationCode ||
+              subsequentBus?.destinationCode ||
+              thirdBus?.destinationCode;
+            const destination = lookupDestinationName(destCode);
+
+            return {
+              busNumber: svcNo,
+              destination,
+              isDelayed: false,
+              nextBus,
+              subsequentBus,
+              thirdBus,
+              noThirdArrivalReason,
+            };
+          }
+
+          // Service is registered at this stop in BusRoutes, but no live bus currently reported in BusArrival
+          return {
+            busNumber: svcNo,
+            destination: 'Loop / Terminal',
+            isDelayed: false,
+            nextBus: undefined,
+            subsequentBus: undefined,
+            thirdBus: undefined,
+            noThirdArrivalReason: 'No more buses tonight (last bus in service)',
+          };
+        });
+
+        setBusesData(formattedList);
+      } catch {
+        setIsArrivalsUnavailable(true);
+      } finally {
+        setIsRefreshing(false);
+        setIsLoadingArrivals(false);
+      }
+    },
+    [selectedStop.code, selectedStop.busServices, lookupDestinationName]
+  );
+
+  // Fetch real arrivals on mount and when selectedStop changes
   useEffect(() => {
-    setBusesData(selectedStop.buses);
+    setIsLoadingArrivals(true);
     setSecondsUntilRefresh(20);
-    setLastRefreshedTime(
-      new Date().toLocaleTimeString('en-SG', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false,
-      })
-    );
-  }, [selectedStop]);
+    fetchLiveArrivals();
+  }, [selectedStop.code, fetchLiveArrivals]);
 
   // Roughly 20-second countdown auto-refresh as required
   useEffect(() => {
@@ -115,66 +248,12 @@ export const ThisStopScreen: React.FC<ThisStopScreenProps> = ({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [fetchLiveArrivals]);
 
   const triggerRefresh = () => {
     setIsRefreshing(true);
     fetchIncidents();
-
-    setBusesData((current) =>
-      current.map((bus) => {
-        let arr1 = bus.nextBus.arrivalMinutes;
-        if (arr1 > 0) {
-          arr1 = Math.max(0, arr1 - 1);
-        } else {
-          arr1 = bus.subsequentBus ? Math.max(1, bus.subsequentBus.arrivalMinutes - 1) : 6;
-        }
-
-        let arr2 = bus.subsequentBus ? bus.subsequentBus.arrivalMinutes : undefined;
-        if (arr2 !== undefined) {
-          arr2 = Math.max(arr1 + 3, arr2 - (arr1 === 0 ? 2 : 1));
-        }
-
-        let arr3 = bus.thirdBus ? bus.thirdBus.arrivalMinutes : undefined;
-        if (arr3 !== undefined) {
-          arr3 = Math.max((arr2 || arr1) + 4, arr3 - 1);
-        }
-
-        return {
-          ...bus,
-          nextBus: {
-            ...bus.nextBus,
-            arrivalMinutes: arr1,
-          },
-          subsequentBus: bus.subsequentBus
-            ? {
-                ...bus.subsequentBus,
-                arrivalMinutes: arr2 ?? 10,
-              }
-            : undefined,
-          thirdBus: bus.thirdBus
-            ? {
-                ...bus.thirdBus,
-                arrivalMinutes: arr3 ?? 18,
-              }
-            : undefined,
-        };
-      })
-    );
-
-    const now = new Date();
-    setLastRefreshedTime(
-      now.toLocaleTimeString('en-SG', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false,
-      })
-    );
-
-    setTimeout(() => {
-      setIsRefreshing(false);
-    }, 500);
+    fetchLiveArrivals(true);
   };
 
   const handleManualRefresh = () => {
@@ -253,7 +332,7 @@ export const ThisStopScreen: React.FC<ThisStopScreenProps> = ({
     }
   }, [incidentsData.fetchedAt, lastRefreshedTime]);
 
-  const getLoadBadge = (load: string) => {
+  const getLoadBadge = (load?: string) => {
     switch (load) {
       case 'Seats Available':
         return {
@@ -276,7 +355,7 @@ export const ThisStopScreen: React.FC<ThisStopScreenProps> = ({
       default:
         return {
           bg: 'bg-slate-50 text-slate-700 border-slate-300',
-          label: load,
+          label: load || 'Seats Available',
           dot: 'bg-slate-400',
         };
     }
@@ -440,6 +519,32 @@ export const ThisStopScreen: React.FC<ThisStopScreenProps> = ({
         )}
       </div>
 
+      {/* Arrival Unavailable Notice — when endpoint cannot be reached */}
+      {isArrivalsUnavailable && (
+        <div
+          id="arrivals-unavailable-notice"
+          className="bg-amber-50 border border-amber-300 rounded-xl p-3.5 shadow-2xs space-y-1"
+        >
+          <div className="flex items-center gap-2 text-amber-900 font-bold text-xs sm:text-sm">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>Bus arrivals are currently unavailable</span>
+          </div>
+          <p className="text-xs text-amber-800">
+            {lastSucceededTime
+              ? `Arrival predictions could not be retrieved from LTA DataMall. Last succeeded at ${lastSucceededTime}.`
+              : 'Arrival predictions are currently unavailable from LTA DataMall. Please try refreshing.'}
+          </p>
+        </div>
+      )}
+
+      {/* Loading Indicator for Initial Arrivals Fetch */}
+      {isLoadingArrivals && busesData.length === 0 && !isArrivalsUnavailable && (
+        <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center justify-center gap-2 text-xs font-bold text-emerald-800 shadow-2xs">
+          <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+          <span>Fetching live arrival predictions from LTA DataMall...</span>
+        </div>
+      )}
+
       {/* The Single Arrivals List: Every service at this stop in one list, no duplicate list */}
       <div id="bus-services-arrivals-list" className="space-y-3">
         <div className="flex items-center justify-between">
@@ -450,6 +555,12 @@ export const ThisStopScreen: React.FC<ThisStopScreenProps> = ({
             3 Upcoming Arrival Times
           </span>
         </div>
+
+        {busesData.length === 0 && !isLoadingArrivals && !isArrivalsUnavailable && (
+          <div className="bg-white rounded-xl border border-slate-200 p-4 text-center text-xs text-slate-500">
+            No bus services known for this stop.
+          </div>
+        )}
 
         <div className="space-y-2.5">
           {busesData.map((bus) => {
@@ -487,27 +598,39 @@ export const ThisStopScreen: React.FC<ThisStopScreenProps> = ({
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
                         Next Bus
                       </span>
-                      <span className="text-base font-black text-slate-900 font-mono">
-                        {bus.nextBus.arrivalMinutes === 0 ? 'Arr' : `${bus.nextBus.arrivalMinutes} min`}
-                      </span>
+                      {bus.nextBus ? (
+                        <span className="text-base font-black text-slate-900 font-mono">
+                          {bus.nextBus.arrivalMinutes === 0 ? 'Arr' : `${bus.nextBus.arrivalMinutes} min`}
+                        </span>
+                      ) : (
+                        <span className="text-xs font-semibold text-slate-500">
+                          Not in service
+                        </span>
+                      )}
                     </div>
 
-                    <div className="flex items-center justify-between gap-1 pt-1">
-                      <span
-                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded border inline-flex items-center gap-1 ${
-                          getLoadBadge(bus.nextBus.load).bg
-                        }`}
-                      >
-                        <span className={`w-1.5 h-1.5 rounded-full ${getLoadBadge(bus.nextBus.load).dot}`} />
-                        {getLoadBadge(bus.nextBus.load).label}
-                      </span>
-                      <span className="flex items-center gap-1 text-[10px] font-semibold text-slate-500">
-                        {bus.nextBus.wheelchairAccessible && (
-                          <Accessibility className="w-3 h-3 text-emerald-600" title="Wheelchair accessible" />
-                        )}
-                        <span>{bus.nextBus.type === 'Double Deck' ? 'DD' : 'SD'}</span>
-                      </span>
-                    </div>
+                    {bus.nextBus ? (
+                      <div className="flex items-center justify-between gap-1 pt-1">
+                        <span
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded border inline-flex items-center gap-1 ${
+                            getLoadBadge(bus.nextBus.load).bg
+                          }`}
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full ${getLoadBadge(bus.nextBus.load).dot}`} />
+                          {getLoadBadge(bus.nextBus.load).label}
+                        </span>
+                        <span className="flex items-center gap-1 text-[10px] font-semibold text-slate-500">
+                          {bus.nextBus.wheelchairAccessible && (
+                            <Accessibility className="w-3 h-3 text-emerald-600" title="Wheelchair accessible" />
+                          )}
+                          <span>{bus.nextBus.type === 'Double Deck' ? 'DD' : 'SD'}</span>
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-slate-500 font-medium pt-1">
+                        No scheduled buses
+                      </div>
+                    )}
                   </div>
 
                   {/* Arrival 2 (Subsequent Bus) */}

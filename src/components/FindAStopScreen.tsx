@@ -297,17 +297,36 @@ export const FindAStopScreen: React.FC<FindAStopScreenProps> = ({
     }
 
     // 3) Stop Name / Road Search (e.g. "Bedok", "Siglap", "Siglap Community Centre")
-    // Never calls network; searches held stop list and orders by distance from selected location
+    // Order name and road searches by how well they match what was typed:
+    // a stop whose name begins with the text before one that merely contains it,
+    // a name match before a road-name match,
+    // and use distance only to separate results that match equally well.
     const matched = busStops.filter((stop) => {
       const matchName = stop.name.toLowerCase().includes(q);
       const matchRoad = stop.road.toLowerCase().includes(q);
       const matchCode = stop.code.toLowerCase().includes(q);
       const matchPostal = stop.postalCode?.toLowerCase().includes(q);
-      const matchService = stop.busServices.some(
+      const matchService = Array.isArray(stop.busServices) && stop.busServices.some(
         (svc) => svc.toLowerCase() === q || svc.toLowerCase().startsWith(q)
       );
       return matchName || matchRoad || matchCode || matchPostal || matchService;
     });
+
+    const getMatchTier = (stop: BusStop): number => {
+      const name = stop.name.toLowerCase();
+      const road = stop.road.toLowerCase();
+
+      // Tier 1: Stop name begins with typed query
+      if (name.startsWith(q)) return 1;
+      // Tier 2: Stop name contains typed query
+      if (name.includes(q)) return 2;
+      // Tier 3: Road name begins with typed query
+      if (road.startsWith(q)) return 3;
+      // Tier 4: Road name contains typed query
+      if (road.includes(q)) return 4;
+      // Tier 5: Other match (code, postal, service)
+      return 5;
+    };
 
     return matched
       .map((stop) => {
@@ -323,7 +342,15 @@ export const FindAStopScreen: React.FC<FindAStopScreenProps> = ({
           walkingTimeMins: Math.max(1, Math.round(dist / 75)),
         };
       })
-      .sort((a, b) => a.distanceMeters - b.distanceMeters);
+      .sort((a, b) => {
+        const tierA = getMatchTier(a);
+        const tierB = getMatchTier(b);
+        if (tierA !== tierB) {
+          return tierA - tierB;
+        }
+        // Use distance only to separate results that match equally well
+        return (a.distanceMeters ?? 0) - (b.distanceMeters ?? 0);
+      });
   }, [searchQuery, busStops, postalSearchResult, selectedLocation]);
 
   // Stops measured from the active location, filtered strictly to 1.5 km (1500m)
@@ -352,6 +379,8 @@ export const FindAStopScreen: React.FC<FindAStopScreenProps> = ({
     : nearbyStopsUnder1500m.slice(0, 5);
 
   const hasSearchActive = searchQuery.trim().length > 0;
+  const isNumericSearch = /^\d+$/.test(searchQuery.trim());
+  const isNameSearch = hasSearchActive && !isNumericSearch;
   const isSearchFailed =
     hasSearchActive && !isNetworkCallInFlight && matchingStops.length === 0;
 
@@ -497,7 +526,7 @@ export const FindAStopScreen: React.FC<FindAStopScreenProps> = ({
                           <span className="font-mono text-xs font-extrabold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-md border border-emerald-300">
                             {stop.code}
                           </span>
-                          {stop.distanceMeters !== undefined && (
+                          {!isNameSearch && stop.distanceMeters !== undefined && (
                             <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
                               {stop.distanceMeters}m · ~{stop.walkingTimeMins} min walk
                             </span>
@@ -514,7 +543,7 @@ export const FindAStopScreen: React.FC<FindAStopScreenProps> = ({
                         <p className="text-xs text-slate-500 truncate">
                           {stop.road}
                         </p>
-                        {stop.busServices && stop.busServices.length > 0 && (
+                        {stop.busServices && stop.busServices.length > 0 ? (
                           <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
                             <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
                               Services:
@@ -527,6 +556,15 @@ export const FindAStopScreen: React.FC<FindAStopScreenProps> = ({
                                 {svc}
                               </span>
                             ))}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 pt-0.5">
+                            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                              Services:
+                            </span>
+                            <span className="text-xs text-slate-400 italic">
+                              Not known
+                            </span>
                           </div>
                         )}
                       </div>
@@ -743,7 +781,7 @@ export const FindAStopScreen: React.FC<FindAStopScreenProps> = ({
                         <p className="text-xs text-slate-500 truncate">
                           {stop.road}
                         </p>
-                        {stop.busServices && stop.busServices.length > 0 && (
+                        {stop.busServices && stop.busServices.length > 0 ? (
                           <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
                             <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
                               Services:
@@ -756,6 +794,15 @@ export const FindAStopScreen: React.FC<FindAStopScreenProps> = ({
                                 {svc}
                               </span>
                             ))}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 pt-0.5">
+                            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                              Services:
+                            </span>
+                            <span className="text-xs text-slate-400 italic">
+                              Not known
+                            </span>
                           </div>
                         )}
                       </div>

@@ -37,7 +37,7 @@ export interface BusArrivalInfo {
   isDelayed: boolean;
   delayReason?: string;
   delayMinutes?: number;
-  nextBus: BusArrivalPrediction;
+  nextBus?: BusArrivalPrediction;
   subsequentBus?: BusArrivalPrediction;
   thirdBus?: BusArrivalPrediction;
   noThirdArrivalReason?: string; // Stated in words when third arrival does not exist, e.g. "Only two arrivals scheduled" or "No more buses tonight"

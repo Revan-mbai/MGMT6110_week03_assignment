@@ -14,6 +14,7 @@ export default function App() {
 
   // Full held catalog of bus stops, initialized with bundled data and supplemented by /api/bus-stops
   const [allBusStops, setAllBusStops] = useState<BusStop[]>(BUS_STOPS_DATA);
+  const [servicesByStop, setServicesByStop] = useState<Record<string, string[]>>({});
 
   // Bug Fix 1: The location chosen in Change Location is lost when the user switches tabs and comes back.
   // Persisted in localStorage so it survives tab switching and page reloads.
@@ -46,77 +47,89 @@ export default function App() {
     }
   });
 
-  // Fetch full bus stop catalog once and hold it in state
+  // Fetch full bus stop catalog and bus routes mapping once, holding both
   useEffect(() => {
+    let stopsList: Array<{
+      code?: string;
+      name?: string;
+      road?: string;
+      postalCode?: string;
+      latitude?: number;
+      longitude?: number;
+      busServices?: string[];
+    }> | null = null;
+    let routesMap: Record<string, string[]> = {};
+
+    const mergeCatalog = () => {
+      if (!stopsList || stopsList.length === 0) return;
+
+      const existingMap = new Map(BUS_STOPS_DATA.map((s) => [s.code, s]));
+      const merged: BusStop[] = stopsList.map((raw) => {
+        const code = String(raw.code || '').trim();
+        const existing = existingMap.get(code);
+        // Real services from LTA BusRoutes, or stop's known services, or empty array (NEVER fallback 14, 65, 106)
+        const services = routesMap[code] || existing?.busServices || raw.busServices || [];
+
+        return {
+          id: `stop-${code}`,
+          code,
+          name: raw.name || existing?.name || `Bus Stop ${code}`,
+          road: raw.road || existing?.road || 'Singapore Road',
+          postalCode: raw.postalCode || existing?.postalCode || '',
+          latitude: raw.latitude || existing?.latitude || 1.3025,
+          longitude: raw.longitude || existing?.longitude || 103.825,
+          busServices: services,
+          buses: existing?.buses || [],
+        };
+      });
+
+      // Ensure all bundled stops are preserved
+      for (const s of BUS_STOPS_DATA) {
+        if (!merged.some((m) => m.code === s.code)) {
+          const services = routesMap[s.code] || s.busServices || [];
+          merged.push({
+            ...s,
+            busServices: services,
+          });
+        }
+      }
+
+      setAllBusStops(merged);
+    };
+
+    // 1) Fetch stop-to-services mapping from LTA DataMall BusRoutes
+    fetch('/api/bus-routes')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.servicesByStop) {
+          routesMap = data.servicesByStop;
+          setServicesByStop(data.servicesByStop);
+          mergeCatalog();
+        }
+      })
+      .catch(() => {});
+
+    // 2) Fetch bus stops catalog from /api/bus-stops
     fetch('/api/bus-stops')
       .then((res) => res.json())
       .then((data) => {
         if (data && Array.isArray(data.stops) && data.stops.length > 0) {
-          const existingMap = new Map(BUS_STOPS_DATA.map((s) => [s.code, s]));
-          const merged: BusStop[] = data.stops.map((raw: {
-            code?: string;
-            name?: string;
-            road?: string;
-            postalCode?: string;
-            latitude?: number;
-            longitude?: number;
-            busServices?: string[];
-          }) => {
-            const code = String(raw.code || '').trim();
-            if (existingMap.has(code)) {
-              return existingMap.get(code)!;
-            }
-            return {
-              id: `stop-${code}`,
-              code,
-              name: raw.name || `Bus Stop ${code}`,
-              road: raw.road || 'Singapore Road',
-              postalCode: raw.postalCode || '',
-              latitude: raw.latitude || 1.3025,
-              longitude: raw.longitude || 103.825,
-              busServices: raw.busServices || ['14', '65', '106'],
-              buses: [
-                {
-                  busNumber: '14',
-                  destination: 'Loop / Terminal',
-                  isDelayed: false,
-                  nextBus: {
-                    arrivalMinutes: 4,
-                    load: 'Seats Available' as const,
-                    type: 'Double Deck' as const,
-                    wheelchairAccessible: true,
-                  },
-                  subsequentBus: {
-                    arrivalMinutes: 11,
-                    load: 'Standing Available' as const,
-                    type: 'Single Deck' as const,
-                    wheelchairAccessible: true,
-                  },
-                  thirdBus: {
-                    arrivalMinutes: 19,
-                    load: 'Seats Available' as const,
-                    type: 'Double Deck' as const,
-                    wheelchairAccessible: true,
-                  },
-                },
-              ],
-            };
-          });
-
-          // Ensure all bundled stops are preserved
-          for (const s of BUS_STOPS_DATA) {
-            if (!merged.some((m) => m.code === s.code)) {
-              merged.push(s);
-            }
-          }
-
-          setAllBusStops(merged);
+          stopsList = data.stops;
+          mergeCatalog();
         }
       })
-      .catch(() => {
-        // Fallback to BUS_STOPS_DATA on fetch error
-      });
+      .catch(() => {});
   }, []);
+
+  // Keep selectedStop synchronized with real busServices
+  useEffect(() => {
+    if (selectedStop) {
+      const updated = allBusStops.find((s) => s.code === selectedStop.code);
+      if (updated && updated.busServices !== selectedStop.busServices) {
+        setSelectedStop(updated);
+      }
+    }
+  }, [allBusStops, selectedStop?.code]);
 
   // Requirement (f): Unified save/unsave control working identically everywhere
   const handleToggleSaveStop = (code: string) => {
@@ -261,6 +274,7 @@ export default function App() {
               onBackToStops={handleBackToFindStops}
               savedStopCodes={savedStopCodes}
               onToggleSaveStop={handleToggleSaveStop}
+              allBusStops={allBusStops}
             />
           </div>
         )}

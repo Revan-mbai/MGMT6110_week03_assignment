@@ -119,19 +119,30 @@ export const SavedStopsScreen: React.FC<SavedStopsScreenProps> = ({
                     <p className="text-xs text-slate-500 truncate">
                       {stop.road}
                     </p>
-                    <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                        Services:
-                      </span>
-                      {stop.busServices.map((svc) => (
-                        <span
-                          key={svc}
-                          className="text-xs font-bold bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded border border-slate-200 font-mono"
-                        >
-                          {svc}
+                    {stop.busServices && stop.busServices.length > 0 ? (
+                      <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                        <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                          Services:
                         </span>
-                      ))}
-                    </div>
+                        {stop.busServices.map((svc) => (
+                          <span
+                            key={svc}
+                            className="text-xs font-bold bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded border border-slate-200 font-mono"
+                          >
+                            {svc}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 pt-0.5">
+                        <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                          Services:
+                        </span>
+                        <span className="text-xs text-slate-400 italic">
+                          Not known
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex flex-col items-end gap-2 shrink-0">

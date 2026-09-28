@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
@@ -6,6 +7,7 @@ import healthHandler from './api/health.js';
 import locationHandler from './api/location.js';
 import incidentsHandler from './api/incidents.js';
 import busStopsHandler from './api/bus-stops.js';
+import busRoutesHandler from './api/bus-routes.js';
 import postalHandler from './api/postal.js';
 
 async function startServer() {
@@ -18,6 +20,7 @@ async function startServer() {
   app.get('/api/location', locationHandler);
   app.get('/api/incidents', incidentsHandler);
   app.get('/api/bus-stops', busStopsHandler);
+  app.get('/api/bus-routes', busRoutesHandler);
   app.get('/api/postal', postalHandler);
 
   // Vite middleware for development
