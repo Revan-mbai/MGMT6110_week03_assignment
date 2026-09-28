@@ -2,6 +2,63 @@
 <html lang="en" style="color-scheme: light;">
   <head>
     <script type="text/javascript">
+      // Intercept and suppress cross-origin Script errors originating from third-party scripts (Disqus, Clarity)
+      (function() {
+        var isThirdPartyScriptError = function(message, source) {
+          if (!message && !source) return true;
+          var msg = String(message || '');
+          var src = String(source || '');
+          return (
+            msg === 'Script error.' ||
+            msg.indexOf('Script error') !== -1 ||
+            src.indexOf('disqus') !== -1 ||
+            src.indexOf('clarity') !== -1
+          );
+        };
+
+        var prevOnError = window.onerror;
+        window.onerror = function(message, source, lineno, colno, error) {
+          if (isThirdPartyScriptError(message, source)) {
+            return true; // suppresses the error
+          }
+          if (typeof prevOnError === 'function') {
+            return prevOnError.apply(this, arguments);
+          }
+          return false;
+        };
+
+        window.addEventListener(
+          'error',
+          function(event) {
+            if (isThirdPartyScriptError(event.message, event.filename)) {
+              event.preventDefault();
+              event.stopPropagation();
+              if (typeof event.stopImmediatePropagation === 'function') {
+                event.stopImmediatePropagation();
+              }
+              return true;
+            }
+          },
+          true // capture phase
+        );
+
+        window.addEventListener(
+          'unhandledrejection',
+          function(event) {
+            var reason = event.reason;
+            var reasonMsg = reason && (reason.message || String(reason));
+            if (isThirdPartyScriptError(reasonMsg, '')) {
+              event.preventDefault();
+              event.stopPropagation();
+              if (typeof event.stopImmediatePropagation === 'function') {
+                event.stopImmediatePropagation();
+              }
+            }
+          },
+          true
+        );
+      })();
+
       if (window.location.hostname === "mgmt-6110-week03-assignment.vercel.app") {
         (function(c,l,a,r,i,t,y){
             c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
@@ -25,4 +82,3 @@
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

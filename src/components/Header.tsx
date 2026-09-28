@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Bus, ArrowLeft, Radio } from 'lucide-react';
+import { Bus, ArrowLeft } from 'lucide-react';
 
 interface HeaderProps {
-  currentScreen: 'stops' | 'arrivals';
+  currentScreen: 'find' | 'this_stop' | 'saved';
   selectedStopName?: string;
-  onBackToStops: () => void;
+  onBackToFindStops: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   currentScreen,
-  onBackToStops,
+  onBackToFindStops,
 }) => {
   const [timeString, setTimeString] = useState<string>('');
 
@@ -37,21 +37,19 @@ export const Header: React.FC<HeaderProps> = ({
     >
       <div className="max-w-xl mx-auto px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          {currentScreen === 'arrivals' ? (
+          {currentScreen === 'this_stop' ? (
             <button
               id="header-back-button"
-              onClick={onBackToStops}
+              type="button"
+              onClick={onBackToFindStops}
               className="flex items-center gap-1.5 px-3 py-2 -ml-1 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-100 transition-colors font-medium text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-              aria-label="Back to nearby stops"
+              aria-label="Back to find a stop"
             >
               <ArrowLeft className="w-5 h-5 text-emerald-400" />
               <span>Back</span>
             </button>
           ) : (
-            <div
-              id="header-logo-container"
-              className="flex items-center gap-2.5"
-            >
+            <div id="header-logo-container" className="flex items-center gap-2.5">
               <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center shadow-inner">
                 <Bus className="w-6 h-6 text-slate-950 stroke-[2.5]" />
               </div>
@@ -60,24 +58,23 @@ export const Header: React.FC<HeaderProps> = ({
                   SG Bus Tracker
                 </h1>
                 <p className="text-xs text-slate-400 font-medium">
-                  Live Arrival & Traffic Feed
+                  Singapore Bus Arrivals & Traffic Alerts
                 </p>
               </div>
             </div>
           )}
         </div>
 
-        {/* Live indicator & Clock */}
+        {/* Singapore Commuter Clock */}
         <div
-          id="header-live-status-pill"
+          id="header-clock-pill"
           className="flex items-center gap-2 bg-slate-800/90 border border-slate-700/80 rounded-full px-3 py-1.5"
         >
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+          <span className="relative flex h-2 w-2">
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
           </span>
-          <span className="text-xs font-bold text-emerald-400 tracking-wider">
-            LIVE
+          <span className="text-xs font-bold text-slate-300 tracking-wider">
+            SGT
           </span>
           <span className="text-slate-500 text-xs">|</span>
           <span className="text-xs font-mono text-slate-200 tabular-nums font-semibold">

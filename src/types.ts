@@ -7,11 +7,21 @@ export interface TrafficIncident {
   impactDescription: string;
   affectedBuses: string[];
   delayMinutes: number;
+  issuedTime: string;
   reportedTimeAgo: string;
+  lastCheckedTime?: string;
   advice?: string;
   lanesAffected?: string;
   estimatedClearance?: string;
   source?: string;
+  isExampleData: boolean;
+}
+
+export interface BusArrivalPrediction {
+  arrivalMinutes: number; // 0 means "Arr"
+  load: 'Seats Available' | 'Standing Available' | 'Limited Standing';
+  type: 'Single Deck' | 'Double Deck';
+  wheelchairAccessible: boolean;
 }
 
 export interface BusArrivalInfo {
@@ -20,22 +30,10 @@ export interface BusArrivalInfo {
   isDelayed: boolean;
   delayReason?: string;
   delayMinutes?: number;
-  nextBus: {
-    arrivalMinutes: number; // 0 = Arr
-    load: 'Seats Available' | 'Standing Available' | 'Limited Standing';
-    type: 'Single Deck' | 'Double Deck';
-    wheelchairAccessible: boolean;
-  };
-  subsequentBus?: {
-    arrivalMinutes: number;
-    load: 'Seats Available' | 'Standing Available' | 'Limited Standing';
-    type: 'Single Deck' | 'Double Deck';
-  };
-  thirdBus?: {
-    arrivalMinutes: number;
-    load: 'Seats Available' | 'Standing Available' | 'Limited Standing';
-    type: 'Single Deck' | 'Double Deck';
-  };
+  nextBus: BusArrivalPrediction;
+  subsequentBus?: BusArrivalPrediction;
+  thirdBus?: BusArrivalPrediction;
+  noThirdArrivalReason?: string; // Stated in words when third arrival does not exist, e.g. "Only two arrivals scheduled" or "No more buses tonight"
 }
 
 export interface BusStop {
@@ -43,8 +41,11 @@ export interface BusStop {
   code: string; // 5-digit code e.g. "09048"
   name: string;
   road: string;
-  distanceMeters: number;
-  walkingTimeMins: number;
+  postalCode: string; // 6-digit Singapore postal code e.g. "248649"
+  latitude: number;
+  longitude: number;
+  distanceMeters?: number;
+  walkingTimeMins?: number;
   busServices: string[];
   buses: BusArrivalInfo[];
 }

@@ -21,16 +21,24 @@ export function DisqusComments() {
   useEffect(() => {
     // Intercept and suppress cross-origin Script errors originating from third-party widgets
     const handleScriptError = (event: ErrorEvent) => {
+      const msg = String(event.message || '');
+      const file = String(event.filename || '');
       if (
-        event.message === 'Script error.' ||
-        (typeof event.filename === 'string' && event.filename.includes('disqus'))
+        msg === 'Script error.' ||
+        msg.includes('Script error') ||
+        file.includes('disqus') ||
+        file.includes('clarity')
       ) {
         event.preventDefault();
         event.stopPropagation();
+        if (typeof event.stopImmediatePropagation === 'function') {
+          event.stopImmediatePropagation();
+        }
         return true;
       }
     };
-    window.addEventListener('error', handleScriptError);
+
+    window.addEventListener('error', handleScriptError, true);
 
     // Set fallback global variables for Disqus legacy compatibility
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -52,12 +60,12 @@ export function DisqusComments() {
     const threadEl = document.getElementById('disqus_thread');
     if (!threadEl) {
       return () => {
-        window.removeEventListener('error', handleScriptError);
+        window.removeEventListener('error', handleScriptError, true);
       };
     }
 
-    if (win.DISQUS && typeof win.DISQUS.reset === 'function') {
-      try {
+    try {
+      if (win.DISQUS && typeof win.DISQUS.reset === 'function') {
         win.DISQUS.reset({
           reload: true,
           config: function (this: { page?: { url?: string; identifier?: string } }) {
@@ -69,23 +77,23 @@ export function DisqusComments() {
             context.page.identifier = PAGE_IDENTIFIER;
           },
         });
-      } catch {
-        // Suppress non-fatal Disqus reset errors in preview iframes
+      } else if (!document.getElementById(SCRIPT_ID)) {
+        const script = document.createElement('script');
+        script.id = SCRIPT_ID;
+        script.src = `https://${DISQUS_SHORTNAME}.disqus.com/embed.js`;
+        script.setAttribute('data-timestamp', String(Date.now()));
+        script.async = true;
+        script.onerror = () => {
+          // Gracefully suppress blocked script errors in preview environments
+        };
+        (document.head || document.body).appendChild(script);
       }
-    } else if (!document.getElementById(SCRIPT_ID)) {
-      const script = document.createElement('script');
-      script.id = SCRIPT_ID;
-      script.src = `https://${DISQUS_SHORTNAME}.disqus.com/embed.js`;
-      script.setAttribute('data-timestamp', String(Date.now()));
-      script.async = true;
-      script.onerror = () => {
-        // Non-fatal if Disqus is blocked by ad-blocker or iframe security policy
-      };
-      (document.head || document.body).appendChild(script);
+    } catch {
+      // Suppress any synchronous widget setup errors in iframe preview
     }
 
     return () => {
-      window.removeEventListener('error', handleScriptError);
+      window.removeEventListener('error', handleScriptError, true);
     };
   }, []);
 
