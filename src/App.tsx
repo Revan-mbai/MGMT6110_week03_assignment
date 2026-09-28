@@ -1,28 +1,124 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { FindAStopScreen } from './components/FindAStopScreen';
 import { ThisStopScreen } from './components/ThisStopScreen';
 import { SavedStopsScreen } from './components/SavedStopsScreen';
 import { DisqusComments } from './components/DisqusComments';
-import { BUS_STOPS_DATA, BUS_STOPS_MAP } from './data';
-import { BusStop } from './types';
+import { BUS_STOPS_DATA, MEASURING_LOCATIONS } from './data';
+import { BusStop, MeasuringLocation } from './types';
 import { Search, Radio, Star } from 'lucide-react';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<'find' | 'this_stop' | 'saved'>('find');
   const [selectedStop, setSelectedStop] = useState<BusStop>(() => BUS_STOPS_DATA[0]);
 
-  // Persisted saved bus stops state in browser localStorage
-  const [savedStopCodes, setSavedStopCodes] = useState<string[]>(() => {
+  // Full held catalog of bus stops, initialized with bundled data and supplemented by /api/bus-stops
+  const [allBusStops, setAllBusStops] = useState<BusStop[]>(BUS_STOPS_DATA);
+
+  // Bug Fix 1: The location chosen in Change Location is lost when the user switches tabs and comes back.
+  // Persisted in localStorage so it survives tab switching and page reloads.
+  const [selectedLocation, setSelectedLocation] = useState<MeasuringLocation>(() => {
     try {
-      const saved = localStorage.getItem('sg_bus_saved_stops') || localStorage.getItem('sg_bus_favourite_stops');
-      return saved ? JSON.parse(saved) : ['09048', '50161'];
+      const saved = localStorage.getItem('sg_bus_active_location');
+      return saved ? JSON.parse(saved) : MEASURING_LOCATIONS[0];
     } catch {
-      return ['09048', '50161'];
+      return MEASURING_LOCATIONS[0];
     }
   });
 
-  // Requirement (f): Unified save/unsave control that works identically everywhere
+  const handleLocationChange = (location: MeasuringLocation) => {
+    setSelectedLocation(location);
+    try {
+      localStorage.setItem('sg_bus_active_location', JSON.stringify(location));
+    } catch {
+      // Local storage fallback
+    }
+  };
+
+  // Bug Fix 2: Saved Stops arrives with stops already in it on a browser that has never opened the site.
+  // Starts completely empty: []
+  const [savedStopCodes, setSavedStopCodes] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('sg_bus_saved_stops');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Fetch full bus stop catalog once and hold it in state
+  useEffect(() => {
+    fetch('/api/bus-stops')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && Array.isArray(data.stops) && data.stops.length > 0) {
+          const existingMap = new Map(BUS_STOPS_DATA.map((s) => [s.code, s]));
+          const merged: BusStop[] = data.stops.map((raw: {
+            code?: string;
+            name?: string;
+            road?: string;
+            postalCode?: string;
+            latitude?: number;
+            longitude?: number;
+            busServices?: string[];
+          }) => {
+            const code = String(raw.code || '').trim();
+            if (existingMap.has(code)) {
+              return existingMap.get(code)!;
+            }
+            return {
+              id: `stop-${code}`,
+              code,
+              name: raw.name || `Bus Stop ${code}`,
+              road: raw.road || 'Singapore Road',
+              postalCode: raw.postalCode || '',
+              latitude: raw.latitude || 1.3025,
+              longitude: raw.longitude || 103.825,
+              busServices: raw.busServices || ['14', '65', '106'],
+              buses: [
+                {
+                  busNumber: '14',
+                  destination: 'Loop / Terminal',
+                  isDelayed: false,
+                  nextBus: {
+                    arrivalMinutes: 4,
+                    load: 'Seats Available' as const,
+                    type: 'Double Deck' as const,
+                    wheelchairAccessible: true,
+                  },
+                  subsequentBus: {
+                    arrivalMinutes: 11,
+                    load: 'Standing Available' as const,
+                    type: 'Single Deck' as const,
+                    wheelchairAccessible: true,
+                  },
+                  thirdBus: {
+                    arrivalMinutes: 19,
+                    load: 'Seats Available' as const,
+                    type: 'Double Deck' as const,
+                    wheelchairAccessible: true,
+                  },
+                },
+              ],
+            };
+          });
+
+          // Ensure all bundled stops are preserved
+          for (const s of BUS_STOPS_DATA) {
+            if (!merged.some((m) => m.code === s.code)) {
+              merged.push(s);
+            }
+          }
+
+          setAllBusStops(merged);
+        }
+      })
+      .catch(() => {
+        // Fallback to BUS_STOPS_DATA on fetch error
+      });
+  }, []);
+
+  // Requirement (f): Unified save/unsave control working identically everywhere
   const handleToggleSaveStop = (code: string) => {
     setSavedStopCodes((prev) => {
       const next = prev.includes(code)
@@ -30,9 +126,8 @@ export default function App() {
         : [...prev, code];
       try {
         localStorage.setItem('sg_bus_saved_stops', JSON.stringify(next));
-        localStorage.setItem('sg_bus_favourite_stops', JSON.stringify(next));
       } catch {
-        // Safe fallback if storage unavailable
+        // Safe fallback
       }
       return next;
     });
@@ -148,10 +243,12 @@ export default function App() {
         {currentScreen === 'find' && (
           <div id="screen-find-stop" role="tabpanel" aria-labelledby="tab-find-stop">
             <FindAStopScreen
-              busStops={BUS_STOPS_DATA}
+              busStops={allBusStops}
               onSelectStop={handleSelectStop}
               savedStopCodes={savedStopCodes}
               onToggleSaveStop={handleToggleSaveStop}
+              selectedLocation={selectedLocation}
+              onLocationChange={handleLocationChange}
             />
           </div>
         )}
@@ -172,7 +269,7 @@ export default function App() {
         {currentScreen === 'saved' && (
           <div id="screen-saved-stops" role="tabpanel" aria-labelledby="tab-saved-stops">
             <SavedStopsScreen
-              allBusStops={BUS_STOPS_DATA}
+              allBusStops={allBusStops}
               savedStopCodes={savedStopCodes}
               onToggleSaveStop={handleToggleSaveStop}
               onSelectStop={handleSelectStop}

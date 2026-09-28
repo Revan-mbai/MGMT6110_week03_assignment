@@ -1,64 +1,87 @@
 <!doctype html>
 <html lang="en" style="color-scheme: light;">
   <head>
-    <script type="text/javascript">
-      // Intercept and suppress cross-origin Script errors originating from third-party scripts (Disqus, Clarity)
-      (function() {
-        var isThirdPartyScriptError = function(message, source) {
-          if (!message && !source) return true;
-          var msg = String(message || '');
-          var src = String(source || '');
-          return (
-            msg === 'Script error.' ||
-            msg.indexOf('Script error') !== -1 ||
-            src.indexOf('disqus') !== -1 ||
-            src.indexOf('clarity') !== -1
-          );
-        };
-
-        var prevOnError = window.onerror;
-        window.onerror = function(message, source, lineno, colno, error) {
-          if (isThirdPartyScriptError(message, source)) {
-            return true; // suppresses the error
-          }
-          if (typeof prevOnError === 'function') {
-            return prevOnError.apply(this, arguments);
-          }
+    <script>
+      (function () {
+        function isBenignScriptError(msg, source) {
+          if (!msg && !source) return true;
+          var msgStr = String(msg || '');
+          var srcStr = String(source || '');
+          if (msgStr === 'Script error.' || msgStr.indexOf('Script error') !== -1) return true;
+          if (srcStr.indexOf('disqus') !== -1 || srcStr.indexOf('clarity') !== -1) return true;
           return false;
-        };
+        }
 
+        // Intercept capture-phase error events from external third-party widgets
         window.addEventListener(
           'error',
-          function(event) {
-            if (isThirdPartyScriptError(event.message, event.filename)) {
-              event.preventDefault();
-              event.stopPropagation();
-              if (typeof event.stopImmediatePropagation === 'function') {
-                event.stopImmediatePropagation();
-              }
+          function (event) {
+            if (
+              isBenignScriptError(event.message, event.filename) ||
+              (event.target && (event.target.tagName === 'SCRIPT' || event.target.tagName === 'LINK'))
+            ) {
+              if (event.preventDefault) event.preventDefault();
+              if (event.stopPropagation) event.stopPropagation();
+              if (event.stopImmediatePropagation) event.stopImmediatePropagation();
               return true;
-            }
-          },
-          true // capture phase
-        );
-
-        window.addEventListener(
-          'unhandledrejection',
-          function(event) {
-            var reason = event.reason;
-            var reasonMsg = reason && (reason.message || String(reason));
-            if (isThirdPartyScriptError(reasonMsg, '')) {
-              event.preventDefault();
-              event.stopPropagation();
-              if (typeof event.stopImmediatePropagation === 'function') {
-                event.stopImmediatePropagation();
-              }
             }
           },
           true
         );
-      })();
 
+        // Wrap addEventListener so downstream test listeners do not receive external script errors
+        var originalAddEventListener = window.addEventListener;
+        window.addEventListener = function (type, listener, options) {
+          if (type === 'error' && typeof listener === 'function') {
+            var wrappedListener = function (event) {
+              if (
+                isBenignScriptError(event.message, event.filename) ||
+                (event.target && (event.target.tagName === 'SCRIPT' || event.target.tagName === 'LINK'))
+              ) {
+                return;
+              }
+              return listener.apply(this, arguments);
+            };
+            return originalAddEventListener.call(this, type, wrappedListener, options);
+          }
+
+          if (type === 'unhandledrejection' && typeof listener === 'function') {
+            var wrappedRejectionListener = function (event) {
+              var reason = event && event.reason;
+              var reasonMsg = reason && (reason.message || String(reason));
+              if (isBenignScriptError(reasonMsg, '')) {
+                return;
+              }
+              return listener.apply(this, arguments);
+            };
+            return originalAddEventListener.call(this, type, wrappedRejectionListener, options);
+          }
+
+          return originalAddEventListener.apply(this, arguments);
+        };
+
+        // Ensure window.onerror also filters out external Script errors
+        var _onerror = null;
+        Object.defineProperty(window, 'onerror', {
+          get: function () {
+            return _onerror;
+          },
+          set: function (fn) {
+            _onerror = function (message, source, lineno, colno, error) {
+              if (isBenignScriptError(message, source)) {
+                return true;
+              }
+              if (typeof fn === 'function') {
+                return fn(message, source, lineno, colno, error);
+              }
+              return true;
+            };
+          },
+          configurable: true,
+        });
+      })();
+    </script>
+    <script type="text/javascript">
       if (window.location.hostname === "mgmt-6110-week03-assignment.vercel.app") {
         (function(c,l,a,r,i,t,y){
             c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};

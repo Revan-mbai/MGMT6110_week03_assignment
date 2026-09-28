@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { BusStop, BusArrivalInfo, TrafficIncident } from '../types';
-import { TRAFFIC_INCIDENTS_DATA } from '../data';
+import { getDistanceInMeters } from '../data';
 import {
   ArrowLeft,
   RefreshCw,
@@ -8,7 +8,9 @@ import {
   Clock,
   Accessibility,
   AlertTriangle,
-  Info
+  Info,
+  CheckCircle2,
+  Radio
 } from 'lucide-react';
 
 interface ThisStopScreenProps {
@@ -18,13 +20,21 @@ interface ThisStopScreenProps {
   onToggleSaveStop: (code: string) => void;
 }
 
+interface IncidentsApiResponse {
+  isReal: boolean;
+  source: string;
+  fetchedAt: string;
+  incidents: TrafficIncident[];
+  error?: string;
+}
+
 export const ThisStopScreen: React.FC<ThisStopScreenProps> = ({
   selectedStop,
   onBackToStops,
   savedStopCodes,
   onToggleSaveStop,
 }) => {
-  // Live arrival simulation state
+  // Live arrival state
   const [busesData, setBusesData] = useState<BusArrivalInfo[]>(selectedStop.buses);
   const [secondsUntilRefresh, setSecondsUntilRefresh] = useState<number>(20);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -37,7 +47,48 @@ export const ThisStopScreen: React.FC<ThisStopScreenProps> = ({
     });
   });
 
-  // Keep busesData synchronized whenever selectedStop changes
+  // Current clock time tick to advance "ago" calculations while the page stays open
+  const [currentClock, setCurrentClock] = useState<Date>(() => new Date());
+
+  // Real traffic incidents state from LTA DataMall
+  const [incidentsData, setIncidentsData] = useState<IncidentsApiResponse>({
+    isReal: false,
+    source: 'Loading...',
+    fetchedAt: new Date().toISOString(),
+    incidents: [],
+  });
+  const [isLoadingIncidents, setIsLoadingIncidents] = useState<boolean>(true);
+
+  // Fetch real traffic incidents from /api/incidents
+  const fetchIncidents = async () => {
+    setIsLoadingIncidents(true);
+    try {
+      const res = await fetch('/api/incidents');
+      const data: IncidentsApiResponse = await res.json();
+      setIncidentsData(data);
+    } catch {
+      setIncidentsData((prev) => ({
+        ...prev,
+        error: 'Unable to reach LTA DataMall traffic incidents service.',
+      }));
+    } finally {
+      setIsLoadingIncidents(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchIncidents();
+  }, []);
+
+  // Update clock every second so "ago" advances dynamically while page is open
+  useEffect(() => {
+    const clockTimer = setInterval(() => {
+      setCurrentClock(new Date());
+    }, 1000);
+    return () => clearInterval(clockTimer);
+  }, []);
+
+  // Synchronize busesData when selectedStop changes
   useEffect(() => {
     setBusesData(selectedStop.buses);
     setSecondsUntilRefresh(20);
@@ -68,6 +119,8 @@ export const ThisStopScreen: React.FC<ThisStopScreenProps> = ({
 
   const triggerRefresh = () => {
     setIsRefreshing(true);
+    fetchIncidents();
+
     setBusesData((current) =>
       current.map((bus) => {
         let arr1 = bus.nextBus.arrivalMinutes;
@@ -131,10 +184,74 @@ export const ThisStopScreen: React.FC<ThisStopScreenProps> = ({
 
   const isSaved = savedStopCodes.includes(selectedStop.code);
 
-  // Relevant traffic advisories that affect the services at this stop
-  const relevantAdvisories: TrafficIncident[] = TRAFFIC_INCIDENTS_DATA.filter((incident) =>
-    incident.affectedBuses.some((svc) => selectedStop.busServices.includes(svc))
-  );
+  /**
+   * Calculates "how long ago" dynamically from current clock now.
+   * Never a fixed number written into code; advances as page stays open.
+   */
+  const calculateAgo = (reportedTime?: string, reportedDate?: string) => {
+    if (!reportedTime) return 'Recently reported';
+
+    const parts = reportedTime.split(':');
+    const h = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    if (isNaN(h) || isNaN(m)) return 'Recently reported';
+
+    const now = currentClock;
+    const incidentDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
+
+    let diffMs = now.getTime() - incidentDate.getTime();
+    if (diffMs < 0) {
+      if (diffMs < -12 * 3600 * 1000) {
+        incidentDate.setDate(incidentDate.getDate() - 1);
+        diffMs = now.getTime() - incidentDate.getTime();
+      } else {
+        diffMs = 0;
+      }
+    }
+
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins <= 0) return 'Just now';
+    if (diffMins === 1) return '1 min ago';
+    if (diffMins < 60) return `${diffMins} mins ago`;
+    const hours = Math.floor(diffMins / 60);
+    const remMins = diffMins % 60;
+    return remMins > 0 ? `${hours} hr ${remMins} mins ago` : `${hours} hr ago`;
+  };
+
+  // Requirement: Only advisories whose coordinates fall within 2 km of the stop being viewed appear
+  const nearbyIncidents = useMemo(() => {
+    if (!incidentsData.incidents || incidentsData.incidents.length === 0) return [];
+
+    return incidentsData.incidents
+      .map((inc) => {
+        const dist = getDistanceInMeters(
+          selectedStop.latitude,
+          selectedStop.longitude,
+          inc.latitude,
+          inc.longitude
+        );
+        return {
+          ...inc,
+          distanceFromStopMeters: dist,
+        };
+      })
+      .filter((inc) => inc.distanceFromStopMeters <= 2000) // Within 2 km only
+      .sort((a, b) => (a.distanceFromStopMeters || 0) - (b.distanceFromStopMeters || 0));
+  }, [incidentsData, selectedStop]);
+
+  const fetchedAtTime = useMemo(() => {
+    try {
+      const d = new Date(incidentsData.fetchedAt);
+      return d.toLocaleTimeString('en-SG', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      });
+    } catch {
+      return lastRefreshedTime;
+    }
+  }, [incidentsData.fetchedAt, lastRefreshedTime]);
 
   const getLoadBadge = (load: string) => {
     switch (load) {
@@ -168,7 +285,10 @@ export const ThisStopScreen: React.FC<ThisStopScreenProps> = ({
   return (
     <section id="this-stop-screen" className="max-w-xl mx-auto px-4 py-4 space-y-4">
       {/* Requirement (c): One line stating what this screen is for and what to give it */}
-      <div id="screen-purpose-line" className="bg-emerald-50 border border-emerald-200 rounded-xl px-3.5 py-2 text-xs font-semibold text-emerald-900 leading-snug">
+      <div
+        id="screen-purpose-line"
+        className="bg-emerald-50 border border-emerald-200 rounded-xl px-3.5 py-2 text-xs font-semibold text-emerald-900 leading-snug"
+      >
         Live arrival predictions, bus capacity, wheelchair access, and traffic advisories for this stop.
       </div>
 
@@ -250,50 +370,75 @@ export const ThisStopScreen: React.FC<ThisStopScreenProps> = ({
         </div>
       </div>
 
-      {/* Traffic Advisories: Sit alongside arrivals, showing issued time, last checked time, and labelled as Example Data */}
-      {relevantAdvisories.length > 0 && (
-        <div id="traffic-advisories-container" className="space-y-2">
-          {relevantAdvisories.map((advisory) => (
-            <div
-              key={advisory.id}
-              className="bg-amber-50/90 border border-amber-300 rounded-xl p-3.5 shadow-2xs space-y-2"
-            >
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-1.5 text-amber-900 font-bold text-xs sm:text-sm">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>Traffic Advisory: {advisory.type}</span>
-                </div>
-
-                {/* Requirement (h): Explicitly labelled as example data; word LIVE does NOT appear */}
-                <span className="text-[10px] font-bold text-slate-600 bg-white/90 border border-amber-300/80 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                  Example Advisory Data (Demonstration)
-                </span>
-              </div>
-
-              <p className="text-xs text-amber-950 font-semibold leading-relaxed">
-                {advisory.location} — {advisory.impactDescription}
-              </p>
-
-              {advisory.advice && (
-                <p className="text-xs text-amber-800 leading-normal bg-amber-100/60 p-2 rounded-lg border border-amber-200">
-                  <span className="font-bold">Commuter Advice: </span>
-                  {advisory.advice}
-                </p>
-              )}
-
-              {/* Requirement (h): Shows issued time and last checked time, refreshing while page is open */}
-              <div className="flex items-center justify-between text-[11px] text-amber-800 pt-1 border-t border-amber-200/60 flex-wrap gap-2">
-                <span>
-                  <strong>Issued: </strong>{advisory.issuedTime} ({advisory.reportedTimeAgo})
-                </span>
-                <span>
-                  <strong>Last checked: </strong>{lastRefreshedTime}
-                </span>
-              </div>
+      {/* Traffic Advisories Panel — Real, from LTA DataMall Traffic Incidents */}
+      {/* Only advisories within 2 km appear. If none do, says there are no incidents reported near this stop */}
+      <div id="traffic-advisories-panel" className="space-y-2">
+        {nearbyIncidents.length === 0 ? (
+          <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-2xs text-xs text-slate-600 flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>
+                No traffic incidents reported near this stop (within 2 km).
+              </span>
             </div>
-          ))}
-        </div>
-      )}
+            <span className="text-[11px] text-slate-500 font-mono">
+              Source: {incidentsData.isReal ? 'LTA DataMall' : 'LTA DataMall Demo'} · Fetched at {fetchedAtTime}
+            </span>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {nearbyIncidents.map((advisory) => {
+              const agoText = calculateAgo(advisory.reportedTime, advisory.reportedDate);
+
+              return (
+                <div
+                  key={advisory.id}
+                  className="bg-amber-50/90 border border-amber-300 rounded-xl p-3.5 shadow-2xs space-y-2"
+                >
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5 text-amber-950 font-bold text-xs sm:text-sm">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>Traffic Incident: {advisory.type}</span>
+                      {advisory.distanceFromStopMeters !== undefined && (
+                        <span className="text-[11px] font-semibold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-full border border-amber-300/80">
+                          ~{advisory.distanceFromStopMeters}m from stop
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Requirement: Badge reading EXAMPLE ADVISORY DATA is removed once data is real */}
+                    {!incidentsData.isReal && (
+                      <span className="text-[10px] font-bold text-slate-600 bg-white/90 border border-amber-300/80 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                        Demonstration Data
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Incident details: what happened and where */}
+                  <p className="text-xs text-amber-950 font-semibold leading-relaxed">
+                    {advisory.details || advisory.message}
+                  </p>
+
+                  {/* Displays real reported time, dynamic advancing "ago" figure, and LTA DataMall source attribution */}
+                  <div className="flex items-center justify-between text-[11px] text-amber-900 pt-1 border-t border-amber-200/80 flex-wrap gap-2">
+                    <div>
+                      {advisory.reportedTime && (
+                        <span>
+                          <strong>Reported: </strong>
+                          {advisory.reportedTime} ({agoText})
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-amber-800 font-mono text-[10px]">
+                      Source: {incidentsData.isReal ? 'LTA DataMall' : 'LTA DataMall Demo'} · Fetched at {fetchedAtTime}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* The Single Arrivals List: Every service at this stop in one list, no duplicate list */}
       <div id="bus-services-arrivals-list" className="space-y-3">

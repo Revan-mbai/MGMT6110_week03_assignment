@@ -2,19 +2,26 @@ export type IncidentSeverity = 'moderate' | 'heavy' | 'critical';
 
 export interface TrafficIncident {
   id: string;
-  location: string;
-  type: 'Accident' | 'Heavy Traffic' | 'Road Works' | 'Vehicle Breakdown' | 'Lane Closure';
-  impactDescription: string;
-  affectedBuses: string[];
-  delayMinutes: number;
-  issuedTime: string;
-  reportedTimeAgo: string;
+  type: string;
+  latitude: number;
+  longitude: number;
+  message?: string;
+  details?: string;
+  location?: string;
+  impactDescription?: string;
+  affectedBuses?: string[];
+  delayMinutes?: number;
+  issuedTime?: string;
+  reportedDate?: string;
+  reportedTime?: string; // Real reported time from incident message e.g. "14:23"
+  reportedTimeAgo?: string; // Computed relative time dynamically e.g. "8 mins ago"
   lastCheckedTime?: string;
   advice?: string;
   lanesAffected?: string;
   estimatedClearance?: string;
   source?: string;
-  isExampleData: boolean;
+  isExampleData?: boolean;
+  distanceFromStopMeters?: number;
 }
 
 export interface BusArrivalPrediction {
@@ -48,4 +55,13 @@ export interface BusStop {
   walkingTimeMins?: number;
   busServices: string[];
   buses: BusArrivalInfo[];
+}
+
+export interface MeasuringLocation {
+  id: string;
+  name: string;
+  label: string;
+  postalCode?: string;
+  latitude: number;
+  longitude: number;
 }

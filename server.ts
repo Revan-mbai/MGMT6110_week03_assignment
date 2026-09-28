@@ -4,15 +4,21 @@ import { createServer as createViteServer } from 'vite';
 import busHandler from './api/bus.js';
 import healthHandler from './api/health.js';
 import locationHandler from './api/location.js';
+import incidentsHandler from './api/incidents.js';
+import busStopsHandler from './api/bus-stops.js';
+import postalHandler from './api/postal.js';
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // API routes FIRST - importing shared handlers from api/bus.js, api/health.js, and api/location.js
+  // API routes FIRST - importing shared handlers from api/
   app.get('/api/bus', busHandler);
   app.get('/api/health', healthHandler);
   app.get('/api/location', locationHandler);
+  app.get('/api/incidents', incidentsHandler);
+  app.get('/api/bus-stops', busStopsHandler);
+  app.get('/api/postal', postalHandler);
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
