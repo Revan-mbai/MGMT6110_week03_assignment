@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Header } from './components/Header';
 import { FindAStopScreen } from './components/FindAStopScreen';
 import { ThisStopScreen } from './components/ThisStopScreen';
@@ -27,14 +27,14 @@ export default function App() {
     }
   });
 
-  const handleLocationChange = (location: MeasuringLocation) => {
+  const handleLocationChange = useCallback((location: MeasuringLocation) => {
     setSelectedLocation(location);
     try {
       localStorage.setItem('sg_bus_active_location', JSON.stringify(location));
     } catch {
       // Local storage fallback
     }
-  };
+  }, []);
 
   // Bug Fix 2: Saved Stops arrives with stops already in it on a browser that has never opened the site.
   // Starts completely empty: []

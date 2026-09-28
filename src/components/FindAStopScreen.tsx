@@ -35,6 +35,7 @@ export const FindAStopScreen: React.FC<FindAStopScreenProps> = ({
   onLocationChange,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [hasSubmittedFiveDigit, setHasSubmittedFiveDigit] = useState(false);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [postalInput, setPostalInput] = useState('');
   const [postalError, setPostalError] = useState<string | null>(null);
@@ -56,6 +57,14 @@ export const FindAStopScreen: React.FC<FindAStopScreenProps> = ({
   const mainSearchAbortRef = useRef<AbortController | null>(null);
   const pickerAbortRef = useRef<AbortController | null>(null);
 
+  // Guard against duplicate postal lookups & loops
+  const lastFetchedPostalRef = useRef<string | null>(null);
+  const onLocationChangeRef = useRef(onLocationChange);
+
+  useEffect(() => {
+    onLocationChangeRef.current = onLocationChange;
+  });
+
   // Clean up abort controllers on unmount
   useEffect(() => {
     return () => {
@@ -70,20 +79,28 @@ export const FindAStopScreen: React.FC<FindAStopScreenProps> = ({
     const trimmed = searchQuery.trim();
     const cleanDigits = trimmed.replace(/\D/g, '');
 
-    // Reset postal search result if input is no longer 6 digits
+    // Reset postal search result if input is no longer exactly 6 digits
     if (trimmed.length !== 6 || cleanDigits.length !== 6) {
       if (mainSearchAbortRef.current) {
         mainSearchAbortRef.current.abort();
         mainSearchAbortRef.current = null;
       }
+      lastFetchedPostalRef.current = null;
       setIsNetworkCallInFlight(false);
       setNetworkCallMessage(null);
       setPostalSearchResult(null);
       setPostalSearchError(null);
+      return;
     }
 
     // Only fire network call when the 6-digit postal code input is COMPLETE
     if (cleanDigits.length === 6 && trimmed.length === 6) {
+      // Guard against infinite loop: If this exact 6-digit postal code was already fetched, do NOT refetch
+      if (lastFetchedPostalRef.current === cleanDigits) {
+        return;
+      }
+      lastFetchedPostalRef.current = cleanDigits;
+
       if (mainSearchAbortRef.current) {
         mainSearchAbortRef.current.abort();
       }
@@ -116,7 +133,7 @@ export const FindAStopScreen: React.FC<FindAStopScreenProps> = ({
             longitude: data.longitude,
           });
           // Also update active location so measuring context persists
-          onLocationChange({
+          onLocationChangeRef.current?.({
             id: `postal-${cleanDigits}`,
             name: `${data.name} (${cleanDigits})`,
             label: `${data.name} (${cleanDigits})`,
@@ -136,7 +153,7 @@ export const FindAStopScreen: React.FC<FindAStopScreenProps> = ({
           setPostalSearchError(err.message || `No location found for postal code ${cleanDigits}.`);
         });
     }
-  }, [searchQuery, onLocationChange]);
+  }, [searchQuery]);
 
   // Handler for Change Location modal postal search
   const handleLookupPickerPostal = (e?: React.FormEvent) => {
@@ -199,7 +216,7 @@ export const FindAStopScreen: React.FC<FindAStopScreenProps> = ({
       if (trimmed.length < 5) {
         return {
           type: 'info' as const,
-          message: `Entering bus stop code: 5 digits needed (e.g. 09048, 50161) or 6-digit postal code. [${trimmed.length} digits typed]`,
+          message: `Entering bus stop code: 5 digits needed (e.g. 09048, 50161) or 6-digit postal code. [${trimmed.length} digit${trimmed.length === 1 ? '' : 's'} typed]`,
         };
       }
       if (trimmed.length === 5) {
@@ -210,9 +227,15 @@ export const FindAStopScreen: React.FC<FindAStopScreenProps> = ({
             message: `5-digit stop code recognised: ${found.name} (${found.road})`,
           };
         }
+        if (hasSubmittedFiveDigit) {
+          return {
+            type: 'warning' as const,
+            message: `Stop code ${trimmed} does not exist in registry. Try another 5-digit code or enter a stop name.`,
+          };
+        }
         return {
-          type: 'warning' as const,
-          message: `Stop code ${trimmed} does not exist in registry. Try another 5-digit code or enter a stop name.`,
+          type: 'info' as const,
+          message: `Entering bus stop code: 5 digits needed (e.g. 09048, 50161) or 6-digit postal code. [5 digits typed]`,
         };
       }
       if (trimmed.length === 6) {
@@ -249,7 +272,7 @@ export const FindAStopScreen: React.FC<FindAStopScreenProps> = ({
       type: 'info' as const,
       message: 'Searching held stops catalog by name or road...',
     };
-  }, [searchQuery, busStops, isNetworkCallInFlight, postalSearchResult, postalSearchError]);
+  }, [searchQuery, busStops, hasSubmittedFiveDigit, isNetworkCallInFlight, postalSearchResult, postalSearchError]);
 
   // Results matching the current search query
   // Stop name search never calls the network; searches held set and orders by distance from selectedLocation
@@ -294,6 +317,11 @@ export const FindAStopScreen: React.FC<FindAStopScreenProps> = ({
           walkingTimeMins: Math.max(1, Math.round(dist / 75)),
         };
       });
+    }
+
+    // Purely numeric input shorter than 5 digits: waiting for complete 5-digit stop code or 6-digit postal code
+    if (isNumeric) {
+      return [];
     }
 
     // 3) Stop Name / Road Search (e.g. "Bedok", "Siglap", "Siglap Community Centre")
@@ -381,8 +409,32 @@ export const FindAStopScreen: React.FC<FindAStopScreenProps> = ({
   const hasSearchActive = searchQuery.trim().length > 0;
   const isNumericSearch = /^\d+$/.test(searchQuery.trim());
   const isNameSearch = hasSearchActive && !isNumericSearch;
-  const isSearchFailed =
-    hasSearchActive && !isNetworkCallInFlight && matchingStops.length === 0;
+
+  const isSearchFailed = useMemo(() => {
+    if (!hasSearchActive || isNetworkCallInFlight) return false;
+    const trimmed = searchQuery.trim();
+    const isNumeric = /^\d+$/.test(trimmed);
+
+    if (isNumeric) {
+      // While input is nothing but digits and shorter than six, do not call it a failure
+      if (trimmed.length < 5) return false;
+      if (trimmed.length === 5) {
+        return hasSubmittedFiveDigit && matchingStops.length === 0;
+      }
+      if (trimmed.length === 6) {
+        if (postalSearchError) return true;
+        if (postalSearchResult && matchingStops.length === 0) return true;
+        return false;
+      }
+      return true; // Exceeds 6 digits
+    }
+
+    return matchingStops.length === 0;
+  }, [hasSearchActive, isNetworkCallInFlight, searchQuery, hasSubmittedFiveDigit, matchingStops.length, postalSearchError, postalSearchResult]);
+
+  const shouldShowSearchResults =
+    hasSearchActive &&
+    (matchingStops.length > 0 || isNetworkCallInFlight || isSearchFailed);
 
   return (
     <section id="find-a-stop-screen" className="max-w-xl mx-auto px-4 py-4 space-y-4">
@@ -420,7 +472,24 @@ export const FindAStopScreen: React.FC<FindAStopScreenProps> = ({
             id="bus-stop-search-input"
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setHasSubmittedFiveDigit(false);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                const trimmed = searchQuery.trim();
+                if (/^\d{5}$/.test(trimmed) && !busStops.some((s) => s.code === trimmed)) {
+                  setHasSubmittedFiveDigit(true);
+                }
+              }
+            }}
+            onBlur={() => {
+              const trimmed = searchQuery.trim();
+              if (/^\d{5}$/.test(trimmed) && !busStops.some((s) => s.code === trimmed)) {
+                setHasSubmittedFiveDigit(true);
+              }
+            }}
             placeholder="e.g. Bedok, Siglap, 545078, 09048, or Siglap CC..."
             className="w-full bg-white border border-slate-300 rounded-xl pl-10 pr-16 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 shadow-2xs"
             autoComplete="off"
@@ -432,6 +501,7 @@ export const FindAStopScreen: React.FC<FindAStopScreenProps> = ({
               type="button"
               onClick={() => {
                 setSearchQuery('');
+                setHasSubmittedFiveDigit(false);
                 setPostalSearchResult(null);
                 setPostalSearchError(null);
               }}
@@ -461,7 +531,7 @@ export const FindAStopScreen: React.FC<FindAStopScreenProps> = ({
       </div>
 
       {/* Search Results Area */}
-      {hasSearchActive && (
+      {shouldShowSearchResults && (
         <div id="search-results-section" className="space-y-2.5">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">
